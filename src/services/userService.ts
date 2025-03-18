@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string;
@@ -401,6 +402,65 @@ export const activateSubscription = async (
     user: updatedUser,
     message: `Подписка активирована до ${endDate.toLocaleDateString()}`
   };
+};
+
+export const getUserSubscriptionData = async (userId: string): Promise<SubscriptionData | null> => {
+  const users = await getUsers();
+  const user = users.find(u => u.id === userId);
+  
+  if (!user) return null;
+  
+  const now = new Date();
+  
+  // Проверка пробного периода
+  if (user.isInTrial && user.trialEndDate) {
+    const trialEnd = new Date(user.trialEndDate);
+    if (trialEnd > now) {
+      const diffTime = Math.abs(trialEnd.getTime() - now.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return {
+        status: 'trial',
+        endDate: user.trialEndDate,
+        daysRemaining: diffDays,
+        tariffId: user.tariffId
+      };
+    }
+  }
+  
+  // Проверка активной подписки
+  if (user.isSubscriptionActive && user.subscriptionEndDate) {
+    const subEnd = new Date(user.subscriptionEndDate);
+    if (subEnd > now) {
+      const diffTime = Math.abs(subEnd.getTime() - now.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return {
+        status: 'active',
+        endDate: user.subscriptionEndDate,
+        daysRemaining: diffDays,
+        tariffId: user.tariffId
+      };
+    }
+  }
+  
+  // Если нет активной подписки или пробного периода
+  return {
+    status: 'expired',
+    tariffId: user.tariffId
+  };
+};
+
+export const getTrialDaysRemaining = (user: User): number => {
+  if (!user.isInTrial || !user.trialEndDate) return 0;
+  
+  const now = new Date();
+  const trialEnd = new Date(user.trialEndDate);
+  
+  if (trialEnd <= now) return 0;
+  
+  const diffTime = Math.abs(trialEnd.getTime() - now.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
 export const getSmtpSettings = async (): Promise<EmailSettings | null> => {
@@ -905,4 +965,163 @@ export const sendEmail = async (
       return { success: false, message: "SMTP настройки не найдены" };
     }
     
-    const smtpSettings = emailSettings.
+    // Имитация отправки письма
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    console.log(`Отправка письма на ${to} с темой ${subject}`);
+    
+    // 95% шанс успеха
+    if (Math.random() < 0.95) {
+      return { success: true, message: "Письмо успешно отправлено" };
+    } else {
+      return { success: false, message: "Ошибка при отправке письма" };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Неизвестная ошибка при отправке письма" 
+    };
+  }
+};
+
+// Additional functions needed based on the error messages
+
+export const changePassword = async (
+  userId: string,
+  oldPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Get users from localStorage 
+    const users = await getUsers();
+    const userIndex = users.findIndex(user => user.id === userId);
+    
+    if (userIndex === -1) {
+      return { success: false, message: "Пользователь не найден" };
+    }
+    
+    const user = users[userIndex];
+    
+    // Check old password
+    if (user.password !== oldPassword) {
+      return { success: false, message: "Текущий пароль неверен" };
+    }
+    
+    // Update password
+    user.password = newPassword;
+    users[userIndex] = user;
+    localStorage.setItem('users', JSON.stringify(users));
+    
+    return { success: true, message: "Пароль успешно изменен" };
+  } catch (error) {
+    return { success: false, message: "Не удалось изменить пароль" };
+  }
+};
+
+export const requestPasswordReset = async (
+  email: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Check if user exists
+    const users = await getUsers();
+    const user = users.find(user => user.email === email);
+    
+    if (!user) {
+      return { 
+        success: false, 
+        message: "Пользователь с таким email не найден" 
+      };
+    }
+    
+    // In a real application, you would send an email with a reset link
+    console.log(`Отправка ссылки для сброса пароля на ${email}`);
+    
+    return { 
+      success: true, 
+      message: "Инструкции по сбросу пароля отправлены на ваш email" 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: "Не удалось отправить запрос на сброс пароля" 
+    };
+  }
+};
+
+export const resetPassword = async (
+  token: string,
+  newPassword: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // In a real application, you would verify the token and update the password
+    console.log(`Сброс пароля с токеном ${token}`);
+    
+    return { 
+      success: true, 
+      message: "Пароль успешно сброшен" 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: "Не удалось сбросить пароль" 
+    };
+  }
+};
+
+export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryItem[]> => {
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check if there's payment history in localStorage
+    const paymentsJson = localStorage.getItem(`payment_history_${userId}`);
+    if (paymentsJson) {
+      return JSON.parse(paymentsJson);
+    }
+    
+    // Return empty array if no history found
+    return [];
+  } catch (error) {
+    console.error("Error fetching payment history:", error);
+    return [];
+  }
+};
+
+export const addPaymentRecord = async (
+  userId: string, 
+  payment: Omit<PaymentHistoryItem, 'id'>
+): Promise<PaymentHistoryItem> => {
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 700));
+    
+    // Get existing payments
+    const payments = await getPaymentHistory(userId);
+    
+    // Create new payment record
+    const newPayment: PaymentHistoryItem = {
+      id: Date.now().toString(),
+      ...payment
+    };
+    
+    // Add to existing payments
+    const updatedPayments = [...payments, newPayment];
+    
+    // Save to localStorage
+    localStorage.setItem(`payment_history_${userId}`, JSON.stringify(updatedPayments));
+    
+    return newPayment;
+  } catch (error) {
+    console.error("Error adding payment record:", error);
+    throw error;
+  }
+};
