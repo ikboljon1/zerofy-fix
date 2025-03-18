@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { 
   Home, 
@@ -19,6 +20,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -29,12 +31,17 @@ import {
 import MobileNavigation from "./MobileNavigation";
 import CalculatorModal from "@/components/CalculatorModal";
 
-// Define menu profile options - keeping only settings, removing logout
+// Define menu profile options - adding logout option
 const profileMenu = [
   {
     label: "Настройки",
     value: "settings",
     icon: Settings,
+  },
+  {
+    label: "Выйти",
+    value: "logout",
+    icon: LogOut,
   }
 ];
 
@@ -49,6 +56,25 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const isMobile = useIsMobile();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Удаляем данные пользователя из хранилища
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+    
+    // Перенаправляем на главную страницу
+    navigate('/');
+  };
+
+  const handleMenuItemClick = (value: string) => {
+    if (value === 'logout') {
+      handleLogout();
+    } else {
+      onTabChange(value);
+    }
+    setShowMobileMenu(false);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -83,10 +109,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("home");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("home")}
                     >
                       <Home className="mr-2 h-4 w-4" />
                       Dashboard
@@ -94,10 +117,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("analytics");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("analytics")}
                     >
                       <BarChart2 className="mr-2 h-4 w-4" />
                       Analytics
@@ -105,10 +125,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("products");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("products")}
                     >
                       <Package className="mr-2 h-4 w-4" />
                       Товары
@@ -116,10 +133,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("stores");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("stores")}
                     >
                       <ShoppingBag className="mr-2 h-4 w-4" />
                       Магазины
@@ -127,10 +141,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("warehouses");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("warehouses")}
                     >
                       <WarehouseIcon className="mr-2 h-4 w-4" />
                       Склады
@@ -138,10 +149,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("advertising");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("advertising")}
                     >
                       <Megaphone className="mr-2 h-4 w-4" />
                       Реклама
@@ -149,10 +157,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <Button 
                       variant="ghost" 
                       className="justify-start"
-                      onClick={() => {
-                        onTabChange("profile");
-                        setShowMobileMenu(false);
-                      }}
+                      onClick={() => handleMenuItemClick("profile")}
                     >
                       <User className="mr-2 h-4 w-4" />
                       Профиль
@@ -164,10 +169,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                           key={item.value}
                           variant="ghost"
                           className="justify-start w-full"
-                          onClick={() => {
-                            onTabChange(item.value);
-                            setShowMobileMenu(false);
-                          }}
+                          onClick={() => handleMenuItemClick(item.value)}
                         >
                           <item.icon className="mr-2 h-4 w-4" />
                           {item.label}
@@ -252,6 +254,10 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
               </Button>
               <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </Button>
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Выйти
               </Button>
             </div>
           </div>

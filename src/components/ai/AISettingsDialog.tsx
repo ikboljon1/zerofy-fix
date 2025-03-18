@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
+import { Loader2, Globe } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { getAISettings, saveAISettings, getAvailableProviders, getAvailableModels } from "@/services/aiService";
 import { AISettings, AIModel } from "@/types/ai";
@@ -16,6 +16,46 @@ interface AISettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Локализация
+const localization = {
+  ru: {
+    title: "Настройки AI-анализа данных",
+    description: "Настройте параметры использования искусственного интеллекта для анализа данных вашего магазина",
+    enableAI: "Включить AI-анализ",
+    provider: "Провайдер AI",
+    selectProvider: "Выберите провайдера",
+    model: "Модель AI",
+    selectModel: "Выберите модель",
+    apiKey: "API ключ",
+    enterApiKey: "Введите ваш API ключ",
+    apiKeyNote: "Ваш API ключ хранится только локально в браузере и не передается никуда, кроме API выбранного провайдера.",
+    testConnection: "Проверить соединение",
+    testing: "Проверка...",
+    saveSettings: "Сохранить настройки",
+    show: "Показать",
+    hide: "Скрыть",
+    language: "Язык",
+  },
+  en: {
+    title: "AI Analysis Settings",
+    description: "Configure AI parameters for your store data analysis",
+    enableAI: "Enable AI Analysis",
+    provider: "AI Provider",
+    selectProvider: "Select provider",
+    model: "AI Model",
+    selectModel: "Select model",
+    apiKey: "API Key",
+    enterApiKey: "Enter your API key",
+    apiKeyNote: "Your API key is stored only locally in the browser and is not transmitted anywhere except to the selected provider's API.",
+    testConnection: "Test Connection",
+    testing: "Testing...",
+    saveSettings: "Save Settings",
+    show: "Show",
+    hide: "Hide",
+    language: "Language",
+  }
+};
+
 const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AISettings>(getAISettings());
@@ -23,6 +63,8 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
   const [showApiKey, setShowApiKey] = useState(false);
   const providers = getAvailableProviders();
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
+  const [language, setLanguage] = useState<'ru' | 'en'>('ru');
+  const texts = localization[language];
 
   useEffect(() => {
     if (open) {
@@ -47,17 +89,17 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
       saveAISettings(settings);
       
       toast({
-        title: "Настройки сохранены",
+        title: language === 'ru' ? "Настройки сохранены" : "Settings saved",
         description: settings.isEnabled 
-          ? "AI-анализ данных включен" 
-          : "AI-анализ данных отключен",
+          ? (language === 'ru' ? "AI-анализ данных включен" : "AI data analysis enabled") 
+          : (language === 'ru' ? "AI-анализ данных отключен" : "AI data analysis disabled"),
       });
       
       onOpenChange(false);
     } catch (error) {
       toast({
-        title: "Ошибка",
-        description: "Не удалось сохранить настройки",
+        title: language === 'ru' ? "Ошибка" : "Error",
+        description: language === 'ru' ? "Не удалось сохранить настройки" : "Failed to save settings",
         variant: "destructive",
       });
     }
@@ -69,7 +111,7 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
     try {
       // Упрощенный тест соединения в зависимости от провайдера
       if (!settings.apiKey) {
-        throw new Error("API ключ не указан");
+        throw new Error(language === 'ru' ? "API ключ не указан" : "API key not provided");
       }
       
       let testUrl = '';
@@ -99,18 +141,20 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
       const response = await fetch(testUrl, { headers });
       
       if (!response.ok) {
-        throw new Error(`Ошибка соединения: ${response.status} ${response.statusText}`);
+        throw new Error(language === 'ru' 
+          ? `Ошибка соединения: ${response.status} ${response.statusText}` 
+          : `Connection error: ${response.status} ${response.statusText}`);
       }
       
       toast({
-        title: "Соединение установлено",
-        description: "API ключ работает корректно",
+        title: language === 'ru' ? "Соединение установлено" : "Connection established",
+        description: language === 'ru' ? "API ключ работает корректно" : "API key works correctly",
       });
     } catch (error) {
-      console.error('Ошибка при тестировании соединения:', error);
+      console.error(language === 'ru' ? 'Ошибка при тестировании соединения:' : 'Error testing connection:', error);
       toast({
-        title: "Ошибка соединения",
-        description: error instanceof Error ? error.message : "Не удалось установить соединение с API",
+        title: language === 'ru' ? "Ошибка соединения" : "Connection error",
+        description: error instanceof Error ? error.message : (language === 'ru' ? "Не удалось установить соединение с API" : "Failed to connect to API"),
         variant: "destructive",
       });
     } finally {
@@ -124,16 +168,31 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
+        <div className="flex justify-end mb-2">
+          <Select value={language} onValueChange={(value: string) => setLanguage(value as 'ru' | 'en')}>
+            <SelectTrigger className="w-[120px]">
+              <span className="flex items-center">
+                <Globe className="h-4 w-4 mr-2" />
+                {texts.language}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ru">Русский</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
         <DialogHeader>
-          <DialogTitle>Настройки AI-анализа данных</DialogTitle>
+          <DialogTitle>{texts.title}</DialogTitle>
           <DialogDescription>
-            Настройте параметры использования искусственного интеллекта для анализа данных вашего магазина
+            {texts.description}
           </DialogDescription>
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="ai-enabled" className="text-base">Включить AI-анализ</Label>
+            <Label htmlFor="ai-enabled" className="text-base">{texts.enableAI}</Label>
             <Switch
               id="ai-enabled"
               checked={settings.isEnabled}
@@ -142,13 +201,13 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
           </div>
           
           <div className="grid gap-2">
-            <Label htmlFor="ai-provider">Провайдер AI</Label>
+            <Label htmlFor="ai-provider">{texts.provider}</Label>
             <Select 
               value={settings.provider} 
               onValueChange={(value) => setSettings({...settings, provider: value})}
             >
               <SelectTrigger id="ai-provider">
-                <SelectValue placeholder="Выберите провайдера" />
+                <SelectValue placeholder={texts.selectProvider} />
               </SelectTrigger>
               <SelectContent>
                 {providers.map((provider) => (
@@ -166,14 +225,14 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
           </div>
           
           <div className="grid gap-2">
-            <Label htmlFor="ai-model">Модель AI</Label>
+            <Label htmlFor="ai-model">{texts.model}</Label>
             <Select 
               value={settings.model} 
               onValueChange={(value) => setSettings({...settings, model: value})}
               disabled={availableModels.length === 0}
             >
               <SelectTrigger id="ai-model">
-                <SelectValue placeholder="Выберите модель" />
+                <SelectValue placeholder={texts.selectModel} />
               </SelectTrigger>
               <SelectContent>
                 {availableModels.map((model) => (
@@ -192,14 +251,14 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
           
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="api-key">API ключ</Label>
+              <Label htmlFor="api-key">{texts.apiKey}</Label>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setShowApiKey(!showApiKey)}
                 className="h-6 px-2"
               >
-                {showApiKey ? "Скрыть" : "Показать"}
+                {showApiKey ? texts.hide : texts.show}
               </Button>
             </div>
             <Input
@@ -207,10 +266,10 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
               type={showApiKey ? "text" : "password"}
               value={settings.apiKey}
               onChange={(e) => setSettings({...settings, apiKey: e.target.value})}
-              placeholder="Введите ваш API ключ"
+              placeholder={texts.enterApiKey}
             />
             <p className="text-xs text-muted-foreground">
-              Ваш API ключ хранится только локально в браузере и не передается никуда, кроме API выбранного провайдера.
+              {texts.apiKeyNote}
             </p>
           </div>
         </div>
@@ -224,13 +283,13 @@ const AISettingsDialog = ({ open, onOpenChange }: AISettingsDialogProps) => {
             {isTesting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Проверка...
+                {texts.testing}
               </>
             ) : (
-              "Проверить соединение"
+              texts.testConnection
             )}
           </Button>
-          <Button onClick={handleSave}>Сохранить настройки</Button>
+          <Button onClick={handleSave}>{texts.saveSettings}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
