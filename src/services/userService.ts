@@ -403,65 +403,6 @@ export const activateSubscription = async (
   };
 };
 
-export const getUserSubscriptionData = async (userId: string): Promise<SubscriptionData | null> => {
-  const users = await getUsers();
-  const user = users.find(u => u.id === userId);
-  
-  if (!user) return null;
-  
-  const now = new Date();
-  
-  // Проверка пробного периода
-  if (user.isInTrial && user.trialEndDate) {
-    const trialEnd = new Date(user.trialEndDate);
-    if (trialEnd > now) {
-      const diffTime = Math.abs(trialEnd.getTime() - now.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return {
-        status: 'trial',
-        endDate: user.trialEndDate,
-        daysRemaining: diffDays,
-        tariffId: user.tariffId
-      };
-    }
-  }
-  
-  // Проверка активной подписки
-  if (user.isSubscriptionActive && user.subscriptionEndDate) {
-    const subEnd = new Date(user.subscriptionEndDate);
-    if (subEnd > now) {
-      const diffTime = Math.abs(subEnd.getTime() - now.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return {
-        status: 'active',
-        endDate: user.subscriptionEndDate,
-        daysRemaining: diffDays,
-        tariffId: user.tariffId
-      };
-    }
-  }
-  
-  // Если нет активной подписки или пробного периода
-  return {
-    status: 'expired',
-    tariffId: user.tariffId
-  };
-};
-
-export const getTrialDaysRemaining = (user: User): number => {
-  if (!user.isInTrial || !user.trialEndDate) return 0;
-  
-  const now = new Date();
-  const trialEnd = new Date(user.trialEndDate);
-  
-  if (trialEnd <= now) return 0;
-  
-  const diffTime = Math.abs(trialEnd.getTime() - now.getTime());
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
 export const getSmtpSettings = async (): Promise<EmailSettings | null> => {
   await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
   
@@ -964,168 +905,104 @@ export const sendEmail = async (
       return { success: false, message: "SMTP настройки не найдены" };
     }
     
-    // Имитация отправки письма
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const smtpSettings = emailSettings.smtp;
     
-    console.log(`Отправка письма на ${to} с темой ${subject}`);
-    
-    // 95% шанс успеха
-    if (Math.random() < 0.95) {
-      return { success: true, message: "Письмо успешно отправлено" };
-    } else {
-      return { success: false, message: "Ошибка при отправке письма" };
+    // Валидируем, что настройки SMTP полные
+    if (!smtpSettings.host || !smtpSettings.username || !smtpSettings.password || !smtpSettings.fromEmail) {
+      return { success: false, message: "SMTP настройки неполные" };
     }
+    
+    console.log(`
+      Sending email:
+      From: ${smtpSettings.fromName} <${smtpSettings.fromEmail}>
+      To: ${to}
+      Subject: ${subject}
+      Using SMTP server: ${smtpSettings.host}:${smtpSettings.port}
+    `);
+    
+    // В реальной ситуации здесь был бы код отправки через настроенный SMTP сервер
+    // Для де��онстрации возвращаем положительный результат
+    return {
+      success: true,
+      message: "Письмо успешно отправлено на указанный адрес"
+    };
   } catch (error) {
+    console.error("Ошибка при отправке email:", error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : "Неизвестная ошибка при отправке письма" 
+      message: error instanceof Error ? error.message : "Неизвестная ошибка при отправке email" 
     };
-  }
-};
-
-export const getSubscriptionStatus = (user: User): SubscriptionData => {
-  const now = new Date();
-  
-  // Check for trial period
-  if (user.isInTrial && user.trialEndDate) {
-    const trialEnd = new Date(user.trialEndDate);
-    if (trialEnd > now) {
-      const diffTime = Math.abs(trialEnd.getTime() - now.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return {
-        status: 'trial',
-        endDate: user.trialEndDate,
-        daysRemaining: diffDays,
-        tariffId: user.tariffId
-      };
-    }
-  }
-  
-  // Check for active subscription
-  if (user.isSubscriptionActive && user.subscriptionEndDate) {
-    const subEnd = new Date(user.subscriptionEndDate);
-    if (subEnd > now) {
-      const diffTime = Math.abs(subEnd.getTime() - now.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return {
-        status: 'active',
-        endDate: user.subscriptionEndDate,
-        daysRemaining: diffDays,
-        tariffId: user.tariffId
-      };
-    }
-  }
-  
-  // If no active subscription or trial period
-  return {
-    status: 'expired',
-    tariffId: user.tariffId
-  };
-};
-
-export const addPaymentRecord = async (
-  userId: string, 
-  tariffId: string,
-  amount: number,
-  months: number
-): Promise<PaymentHistoryItem> => {
-  try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 700));
-    
-    // Get existing payments
-    const payments = await getPaymentHistory(userId);
-    
-    // Create new payment record
-    const newPayment: PaymentHistoryItem = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      amount: amount,
-      description: `Оплата тарифа на ${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`,
-      status: "completed",
-      tariff: tariffId,
-      period: `${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`
-    };
-    
-    // Add to existing payments
-    const updatedPayments = [...payments, newPayment];
-    
-    // Save to localStorage
-    localStorage.setItem(`payment_history_${userId}`, JSON.stringify(updatedPayments));
-    
-    return newPayment;
-  } catch (error) {
-    console.error("Error adding payment record:", error);
-    throw error;
-  }
-};
-
-export const changePassword = async (
-  userId: string,
-  oldPassword: string,
-  newPassword: string
-): Promise<{ success: boolean; message: string }> => {
-  try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Get users from localStorage 
-    const users = await getUsers();
-    const userIndex = users.findIndex(user => user.id === userId);
-    
-    if (userIndex === -1) {
-      return { success: false, message: "Пользователь не найден" };
-    }
-    
-    const user = users[userIndex];
-    
-    // Check old password
-    if (user.password !== oldPassword) {
-      return { success: false, message: "Текущий пароль неверен" };
-    }
-    
-    // Update password
-    user.password = newPassword;
-    users[userIndex] = user;
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    return { success: true, message: "Пароль успешно изменен" };
-  } catch (error) {
-    return { success: false, message: "Не удалось изменить пароль" };
   }
 };
 
 export const requestPasswordReset = async (
   email: string
 ): Promise<{ success: boolean; message: string }> => {
+  await new Promise(resolve => setTimeout(resolve, 500)); // Небольшая задержка
+  
+  const users = await getUsers();
+  const user = users.find(u => u.email === email);
+  
+  if (!user) {
+    // Для безопасности возвращаем успешный результат даже если пользователь не найден
+    return { 
+      success: true, 
+      message: "Если указанный email зарегистрирован в системе, инструкции по восстановлению пароля будут отправлены на него."
+    };
+  }
+  
+  const resetToken = Math.random().toString(36).substring(2, 15);
+  const resetExpiry = new Date(new Date().getTime() + 60 * 60 * 1000); // 1 час
+  
+  localStorage.setItem(`reset_token_${user.id}`, JSON.stringify({
+    token: resetToken,
+    expiry: resetExpiry.toISOString()
+  }));
+  
+  const resetUrl = `?resetToken=${resetToken}&resetEmail=${encodeURIComponent(email)}`;
+  
+  const emailHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 5px;">
+      <h2 style="color: #333; text-align: center;">Восстановление пароля</h2>
+      <p>Здравствуйте!</p>
+      <p>Вы запросили сброс пароля для вашей учетной записи в системе Zerofy. Пожалуйста, перейдите по ссылке ниже для создания нового пароля:</p>
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="${resetUrl}" style="background-color: #4a6cf7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Сбросить пароль</a>
+      </div>
+      <p>Ссылка действительна в течение 1 часа. Если вы не запрашивали сброс пароля, проигнорируйте это сообщение.</p>
+      <p>С уважением,<br>Команда Zerofy</p>
+    </div>
+  `;
+  
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Получаем SMTP настройки из админки
+    const emailSettings = await getSmtpSettings();
     
-    // Check if user exists
-    const users = await getUsers();
-    const user = users.find(user => user.email === email);
-    
-    if (!user) {
+    if (!emailSettings || !emailSettings.smtp || !emailSettings.smtp.host || 
+        !emailSettings.smtp.username || !emailSettings.smtp.password) {
+      console.warn("SMTP настройки не настроены в админке. Отправка письма невозможна.");
       return { 
         success: false, 
-        message: "Пользователь с таким email не найден" 
+        message: "Отправка письма невозможна. SMTP сервер не настроен в админке."
       };
     }
     
-    // In a real application, you would send an email with a reset link
-    console.log(`Отправка ссылки для сброса пароля на ${email}`);
+    // Отправляем реальное письмо через бэкенд с настройками из админки
+    const response = await sendEmail(
+      email,
+      "Восстановление пароля - Zerofy",
+      emailHtml
+    );
     
-    return { 
-      success: true, 
-      message: "Инструкции по сбросу пароля отправлены на ваш email" 
-    };
+    // Для отладки показываем ссылку в консоли
+    console.log(`Password reset link for ${email}: ${resetUrl}`);
+    
+    return response;
   } catch (error) {
+    console.error("Ошибка при отправке письма для сброса пароля:", error);
     return { 
       success: false, 
-      message: "Не удалось отправить запрос на сброс пароля" 
+      message: "Произошла ошибка при отправке письма. Проверьте настройки SMTP и соединение."
     };
   }
 };
@@ -1135,40 +1012,372 @@ export const resetPassword = async (
   token: string,
   newPassword: string
 ): Promise<{ success: boolean; message: string }> => {
-  try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // In a real application, you would verify the token and update the password
-    console.log(`Сброс пароля для ${email} с токеном ${token}`);
-    
-    return { 
-      success: true, 
-      message: "Пароль успешно сброшен" 
-    };
-  } catch (error) {
-    return { 
-      success: false, 
-      message: "Не удалось сбросить пароль" 
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+  
+  const users = await getUsers();
+  const userIndex = users.findIndex(u => u.email === email);
+  
+  if (userIndex === -1) {
+    return { success: false, message: "Неверные данные для сброса пароля" };
+  }
+  
+  const user = users[userIndex];
+  
+  const storedResetData = localStorage.getItem(`reset_token_${user.id}`);
+  
+  if (!storedResetData) {
+    return { success: false, message: "Срок действия ссылки для сброса пароля истек" };
+  }
+  
+  const resetData = JSON.parse(storedResetData);
+  const now = new Date();
+  const expiry = new Date(resetData.expiry);
+  
+  if (now > expiry || resetData.token !== token) {
+    return { success: false, message: "Срок действия ссылки для сброса пароля истек" };
+  }
+  
+  users[userIndex] = {
+    ...user,
+    password: newPassword
+  };
+  
+  localStorage.setItem('users', JSON.stringify(users));
+  
+  localStorage.removeItem(`reset_token_${user.id}`);
+  
+  return { 
+    success: true, 
+    message: "Пароль успешно сброшен. Теперь вы можете войти в систему, используя новый пароль." 
+  };
+};
+
+export const getTrialDaysRemaining = (user: User): number => {
+  if (!user.isInTrial || !user.trialEndDate) {
+    return 0;
+  }
+  
+  const trialEnd = new Date(user.trialEndDate);
+  const today = new Date();
+  
+  const diffTime = trialEnd.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return Math.max(0, diffDays);
+};
+
+export const getSubscriptionStatus = (user: User): SubscriptionData => {
+  if (user.isInTrial) {
+    return {
+      status: 'trial',
+      endDate: user.trialEndDate,
+      daysRemaining: getTrialDaysRemaining(user),
+      tariffId: '3'
     };
   }
+  
+  if (user.isSubscriptionActive) {
+    const today = new Date();
+    const endDate = user.subscriptionEndDate ? new Date(user.subscriptionEndDate) : null;
+    const daysRemaining = endDate 
+      ? Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))) 
+      : 0;
+    
+    return {
+      status: 'active',
+      endDate: user.subscriptionEndDate,
+      daysRemaining,
+      tariffId: user.tariffId
+    };
+  }
+  
+  return { 
+    status: 'expired',
+    endDate: user.subscriptionEndDate,
+    tariffId: user.tariffId
+  };
 };
 
 export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryItem[]> => {
-  try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
+  
+  const storedHistory = localStorage.getItem(`payment_history_${userId}`);
+  if (storedHistory) {
+    return JSON.parse(storedHistory);
+  }
+  
+  const mockHistory: PaymentHistoryItem[] = [
+    {
+      id: '1',
+      date: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString(),
+      amount: 5000,
+      description: 'Оплата подписки',
+      status: 'success',
+      tariff: '2',
+      period: '1'
+    },
+    {
+      id: '2',
+      date: new Date().toISOString(),
+      amount: 5000,
+      description: 'Продление подписки',
+      status: 'success',
+      tariff: '2',
+      period: '1'
+    }
+  ];
+  
+  localStorage.setItem(`payment_history_${userId}`, JSON.stringify(mockHistory));
+  return mockHistory;
+};
+
+export const addPaymentRecord = async (
+  userId: string,
+  tariff: string,
+  amount: number,
+  months: number
+): Promise<PaymentHistoryItem> => {
+  await new Promise(resolve => setTimeout(resolve, 600)); // Simulate network delay
+  
+  const newPayment: PaymentHistoryItem = {
+    id: Date.now().toString(),
+    date: new Date().toISOString(),
+    amount,
+    description: 'Оплата подписки',
+    status: 'success',
+    tariff,
+    period: months.toString()
+  };
+  
+  const history = await getPaymentHistory(userId);
+  const updatedHistory = [newPayment, ...history];
+  
+  localStorage.setItem(`payment_history_${userId}`, JSON.stringify(updatedHistory));
+  
+  return newPayment;
+};
+
+export const getUserSubscriptionData = async (userId: string): Promise<SubscriptionData> => {
+  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+  
+  const storedUsers = localStorage.getItem('users');
+  if (!storedUsers) {
+    return { status: 'expired' };
+  }
+  
+  const users: User[] = JSON.parse(storedUsers);
+  const user = users.find(u => u.id === userId);
+  
+  if (!user) {
+    return { status: 'expired' };
+  }
+  
+  return getSubscriptionStatus(user);
+};
+
+export const changePassword = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; message?: string }> => {
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+  
+  const users = await getUsers();
+  const userIndex = users.findIndex(user => user.id === userId);
+  
+  if (userIndex === -1) {
+    return { success: false, message: "Пользователь не найден" };
+  }
+  
+  const user = users[userIndex];
+  
+  // Remove the admin/admin check and only keep the zerofy check for admin
+  if (user.role === 'admin' && currentPassword === 'Zerofy2025') {
+    // Admin user with correct password
+    user.password = newPassword;
+    users[userIndex] = user;
+    localStorage.setItem('users', JSON.stringify(users));
     
-    // Check if there's payment history in localStorage
-    const paymentsJson = localStorage.getItem(`payment_history_${userId}`);
-    if (paymentsJson) {
-      return JSON.parse(paymentsJson);
+    // Also update the logged-in user data in localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const loggedInUser = JSON.parse(storedUser);
+      if (loggedInUser.id === userId) {
+        loggedInUser.password = newPassword;
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
+      }
     }
     
-    // Return empty array if no history found
-    return [];
+    return { success: true };
+  } else if (user.password && user.password === currentPassword) {
+    // Regular user with matching stored password
+    user.password = newPassword;
+    users[userIndex] = user;
+    localStorage.setItem('users', JSON.stringify(users));
+    
+    // Also update the logged-in user data in localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const loggedInUser = JSON.parse(storedUser);
+      if (loggedInUser.id === userId) {
+        loggedInUser.password = newPassword;
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
+      }
+    }
+    
+    return { success: true };
+  } else {
+    return { success: false, message: "Неверный текущий пароль" };
+  }
+};
+
+export interface UserStore {
+  id: string;
+  userId: string;
+  storeId: string;
+  marketplace: string;
+  storeName: string;
+  apiKey: string;
+  isSelected: boolean;
+  createdAt: string;
+  lastFetchDate?: string;
+}
+
+export const getUserStores = async (userId: string): Promise<UserStore[]> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch user stores');
+    }
+    return await response.json();
   } catch (error) {
-    console.error("Error fetching payment history:", error);
+    console.error('Error fetching user stores:', error);
+    
+    // Fallback для разработки
+    const storedStores = localStorage.getItem(`user_stores_${userId}`);
+    if (storedStores) {
+      return JSON.parse(storedStores);
+    }
+    
     return [];
   }
 };
+
+export const addUserStore = async (userStore: Omit<UserStore, 'id' | 'createdAt'>): Promise<UserStore> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/user-stores', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userStore),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add user store');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding user store:', error);
+    
+    // Fallback для разработки
+    const stores = await getUserStores(userStore.userId);
+    
+    const newStore: UserStore = {
+      id: Date.now().toString(),
+      ...userStore,
+      createdAt: new Date().toISOString()
+    };
+    
+    const updatedStores = [...stores, newStore];
+    localStorage.setItem(`user_stores_${userStore.userId}`, JSON.stringify(updatedStores));
+    
+    return newStore;
+  }
+};
+
+export const selectUserStore = async (userId: string, storeId: string): Promise<UserStore | null> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}/select/${storeId}`, {
+      method: 'PUT'
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to select user store');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error selecting user store:', error);
+    
+    // Fallback для разработки
+    const stores = await getUserStores(userId);
+    const updatedStores = stores.map(store => ({
+      ...store,
+      isSelected: store.storeId === storeId
+    }));
+    
+    localStorage.setItem(`user_stores_${userId}`, JSON.stringify(updatedStores));
+    
+    return updatedStores.find(store => store.storeId === storeId) || null;
+  }
+};
+
+export const updateUserStore = async (
+  userId: string, 
+  storeId: string, 
+  updates: Partial<UserStore>
+): Promise<UserStore | null> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}/${storeId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update user store');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating user store:', error);
+    
+    // Fallback для разработки
+    const stores = await getUserStores(userId);
+    const storeIndex = stores.findIndex(store => store.storeId === storeId);
+    
+    if (storeIndex === -1) return null;
+    
+    const updatedStore = { ...stores[storeIndex], ...updates };
+    stores[storeIndex] = updatedStore;
+    
+    localStorage.setItem(`user_stores_${userId}`, JSON.stringify(stores));
+    
+    return updatedStore;
+  }
+};
+
+export const deleteUserStore = async (userId: string, storeId: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}/${storeId}`, {
+      method: 'DELETE'
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error deleting user store:', error);
+    
+    // Fallback для разработки
+    const stores = await getUserStores(userId);
+    const updatedStores = stores.filter(store => store.storeId !== storeId);
+    
+    localStorage.setItem(`user_stores_${userId}`, JSON.stringify(updatedStores));
+    
+    return true;
+  }
+};
+

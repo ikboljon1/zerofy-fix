@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { User, getUsers } from "@/services/userService";
@@ -154,7 +153,7 @@ export default function UserList({ onSelectUser, onAddUser }: UserListProps) {
     switch (tariffId) {
       case '1': return 'Базовый';
       case '2': return 'Профессиональный';
-      case '3': return 'Премиум';
+      case '3': return 'Бизнес';
       case '4': return 'Корпоративный';
       default: return `Тариф ${tariffId}`;
     }

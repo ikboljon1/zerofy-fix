@@ -56,11 +56,7 @@ const PasswordResetForm = ({
 
     try {
       // Выполняем запрос на сброс пароля
-      const result = await resetPassword(
-        email,
-        token,
-        data.password
-      );
+      const result = await resetPassword(email, token, data.password);
       
       if (result.success) {
         toast({
