@@ -1,25 +1,12 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { changePassword } from "@/services/userService";
 import { Lock, Key, Eye, EyeOff, Check, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-const changePassword = async (
-  userId: string,
-  currentPassword: string,
-  newPassword: string
-): Promise<{ success: boolean; message?: string }> => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log(`Password change for user: ${userId}`);
-  
-  if (currentPassword === "wrongpassword") {
-    return { success: false, message: "Неверный текущий пароль" };
-  }
-  
-  return { success: true };
-};
 
 interface PasswordChangeFormProps {
   userId: string;
@@ -84,6 +71,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({ userId }) => {
           description: "Пароль успешно изменен",
         });
         
+        // Reset form
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');

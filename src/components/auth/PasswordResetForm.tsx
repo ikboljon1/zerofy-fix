@@ -7,25 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { resetPassword } from "@/services/userService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Key, Eye, EyeOff } from "lucide-react";
-
-// Mock implementation of resetPassword
-const resetPassword = async (
-  email: string,
-  token: string,
-  newPassword: string
-): Promise<{ success: boolean; message: string }> => {
-  // Simulate a network request
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log(`Password reset for email: ${email} with token: ${token}`);
-  
-  // Always return success in this mock implementation
-  return {
-    success: true,
-    message: "Пароль успешно сброшен. Теперь вы можете войти в систему, используя новый пароль."
-  };
-};
 
 const resetPasswordSchema = z
   .object({

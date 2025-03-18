@@ -7,21 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { requestPasswordReset } from "@/services/userService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Mail, ArrowLeft } from "lucide-react";
-
-// Mock implementation of requestPasswordReset
-const requestPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
-  // Simulate a network request
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log(`Password reset requested for email: ${email}`);
-  
-  // Always return success in this mock implementation
-  return {
-    success: true,
-    message: "Если указанный email зарегистрирован в системе, инструкции по восстановлению пароля будут отправлены на него."
-  };
-};
 
 const resetRequestSchema = z.object({
   email: z.string().email({ message: "Введите корректный email" }),
