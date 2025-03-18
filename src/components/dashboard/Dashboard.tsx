@@ -206,11 +206,19 @@ const Dashboard = () => {
       }
       console.log("[Dashboard] Fetching orders and sales data...");
       try {
-        const [ordersResult, salesResult] = await Promise.all([fetchAndUpdateOrders(selectedStore), fetchAndUpdateSales(selectedStore)]);
+        const [ordersResult, salesResult] = await Promise.all([
+          fetchAndUpdateOrders(selectedStore, { forceRefresh: retryCount > 0 }), 
+          fetchAndUpdateSales(selectedStore, { forceRefresh: retryCount > 0 })
+        ]);
+        
         resetRateLimitState();
-        setIsDemoData(false);
+        
+        const hasOrderDemoData = ordersResult?.isDemoData || false;
+        const hasSalesDemoData = salesResult?.isDemoData || false;
+        setIsDemoData(hasOrderDemoData || hasSalesDemoData);
+        
         if (ordersResult) {
-          console.log(`[Dashboard] Received ${ordersResult.orders.length} orders from API`);
+          console.log(`[Dashboard] Received ${ordersResult.orders.length} orders ${hasOrderDemoData ? '(DEMO)' : 'from API'}`);
           setOrders(ordersResult.orders);
           setWarehouseDistribution(ordersResult.warehouseDistribution);
           setRegionDistribution(ordersResult.regionDistribution);
@@ -229,7 +237,7 @@ const Dashboard = () => {
           }
         }
         if (salesResult) {
-          console.log(`[Dashboard] Received ${salesResult.length} sales from API`);
+          console.log(`[Dashboard] Received ${salesResult.length} sales ${hasSalesDemoData ? '(DEMO)' : 'from API'}`);
           setSales(salesResult);
         } else {
           console.log("[Dashboard] No sales from API, trying local storage");
@@ -243,40 +251,40 @@ const Dashboard = () => {
             setIsDemoData(true);
           }
         }
+        
         if (selectedStore.apiKey) {
           const now = new Date();
           const thirtyDaysAgo = new Date(now);
           thirtyDaysAgo.setDate(now.getDate() - 30);
           const dateFrom = format(thirtyDaysAgo, 'yyyy-MM-dd');
           const dateTo = format(now, 'yyyy-MM-dd');
-          console.log(`[Dashboard] Запрашиваем данные о средних продажах с ${dateFrom} по ${dateTo}`);
-          console.log(`[Dashboard] Ключ кэша для периода: ${dateFrom}_${dateTo}`);
-          console.log(`[Dashboard] API ключ: ${selectedStore.apiKey ? selectedStore.apiKey.substring(0, 5) + '...' + selectedStore.apiKey.substring(selectedStore.apiKey.length - 5) : 'отсутствует'}`);
-          fetchAverageDailySalesFromAPI(selectedStore.apiKey, dateFrom, dateTo).then(data => {
-            console.log('[Dashboard] Получены данные о средних продажах:', `${Object.keys(data).length} товаров`);
-            const sampleEntries = Object.entries(data).slice(0, 3);
-            if (sampleEntries.length > 0) {
-              console.log('[Dashboard] Примеры данных:', sampleEntries);
-            } else {
-              console.log('[Dashboard] Нет данных о средних продажах');
+          
+          try {
+            console.log(`[Dashboard] Запрашиваем данные о средних продажах с ${dateFrom} по ${dateTo}`);
+            
+            const result = await updateCacheIfNeeded(
+              CACHE_KEYS.AVG_SALES, 
+              selectedStore.id, 
+              async () => fetchAverageDailySalesFromAPI(selectedStore.apiKey!, dateFrom, dateTo),
+              {
+                forceUpdate: retryCount > 0,
+                allowDemo: true,
+                generateDemoFn: () => ({ /* dummy data */ })
+              }
+            );
+            
+            if (result.isDemo) {
               setIsDemoData(true);
             }
-          }).catch(error => {
+            
+            console.log(`[Dashboard] Получены данные о средних продажах: ${
+              Object.keys(result.data).length
+            } товаров (${result.isDemo ? 'ДЕМО' : 'реальные'}, ${result.fromCache ? 'из кеша' : 'свежие'})`);
+            
+          } catch (error) {
             console.error('[Dashboard] Ошибка при получении данных о средних продажах:', error);
-            if (error instanceof Error) {
-              console.error(`[Dashboard] Сообщение ошибки: ${error.message}`);
-              console.error(`[Dashboard] Стек вызовов: ${error.stack}`);
-            }
-            if (error.message?.includes('429') || error.status === 429) {
-              console.log('[Dashboard] Rate limit detected during fetchAverageDailySalesFromAPI');
-              setIsDemoData(true);
-              toast({
-                title: "Ограничение API",
-                description: "Не удалось получить данные о средних продажах из-за ограничений API",
-                variant: "destructive"
-              });
-            }
-          });
+            setIsDemoData(true);
+          }
         } else {
           console.log("[Dashboard] Нет API ключа для запроса средних продаж");
           setIsDemoData(true);
@@ -325,7 +333,7 @@ const Dashboard = () => {
       setIsLoading(false);
       setIsDemoData(true);
     }
-  }, [selectedStoreId, toast]);
+  }, [selectedStoreId, toast, retryCount, handleApiRateLimit, resetRateLimitState, getOrdersData, getSalesData]);
 
   useEffect(() => {
     const selectedStore = getSelectedStore();
