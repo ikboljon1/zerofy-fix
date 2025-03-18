@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -871,3 +872,357 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Выйти из системы
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="password">
+          <Card>
+            <CardHeader>
+              <CardTitle>Изменение пароля</CardTitle>
+              <CardDescription>
+                Обновите ваш пароль для повышения безопасности учетной записи
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PasswordChangeForm 
+                email={userProfile?.email || ''} 
+                disabled={isSubscriptionExpired && !userProfile?.isInTrial}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="subscription">
+          <Card>
+            <CardHeader>
+              <CardTitle>Управление подпиской</CardTitle>
+              <CardDescription>
+                Выберите подходящий для вас тарифный план
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {subscriptionPlans.map((plan) => (
+                  <TariffCard 
+                    key={plan.id} 
+                    plan={plan} 
+                    onClick={() => handleSelectPlan(plan.name)} 
+                    isSelected={selectedPlan === plan.name}
+                  />
+                ))}
+              </div>
+              
+              <div className="mt-8">
+                <h3 className="text-lg font-medium mb-4">Выберите период оплаты</h3>
+                <RadioGroup 
+                  value={selectedMonths.toString()} 
+                  onValueChange={(value) => handleMonthsChange(parseInt(value))}
+                  className="flex flex-col space-y-3"
+                  disabled={!selectedPlan}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="1" id="month-1" />
+                    <Label htmlFor="month-1" className="font-normal">1 месяц (без скидки)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="3" id="month-3" />
+                    <Label htmlFor="month-3" className="font-normal">
+                      3 месяца <Badge variant="outline" className="ml-2 bg-green-500/10 text-green-500 border-green-500/30">Скидка 10%</Badge>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="6" id="month-6" />
+                    <Label htmlFor="month-6" className="font-normal">
+                      6 месяцев <Badge variant="outline" className="ml-2 bg-green-500/10 text-green-500 border-green-500/30">Скидка 15%</Badge>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="12" id="month-12" />
+                    <Label htmlFor="month-12" className="font-normal">
+                      12 месяцев <Badge variant="outline" className="ml-2 bg-green-500/10 text-green-500 border-green-500/30">Скидка 25%</Badge>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <Button 
+                  onClick={handleProceedToPayment} 
+                  disabled={!selectedPlan}
+                  className="flex items-center gap-2"
+                >
+                  <CreditCardIcon className="h-4 w-4" />
+                  Перейти к оплате
+                </Button>
+                
+                {selectedPlan && (
+                  <Alert className="h-auto m-0 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-2">
+                      <BadgePercent className="h-5 w-5 text-blue-800 dark:text-blue-300" />
+                      <div>
+                        <AlertTitle className="text-blue-800 dark:text-blue-300">Стоимость</AlertTitle>
+                        <AlertDescription className="text-blue-800 dark:text-blue-300">
+                          <span className="font-bold">{calculateTotalPrice(subscriptionPlans.find(p => p.name === selectedPlan)?.id || "1").toLocaleString('ru-RU')} ₽</span>
+                          {discountPercentage > 0 && (
+                            <span className="ml-2 text-green-600 dark:text-green-400">
+                              (скидка {discountPercentage}%)
+                            </span>
+                          )}
+                        </AlertDescription>
+                      </div>
+                    </div>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="payment">
+          <Card>
+            <CardHeader>
+              <CardTitle>Оплата подписки</CardTitle>
+              <CardDescription>
+                Управление платежными данными и оплата услуг
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Ваши карты</h3>
+                
+                {savedCard ? (
+                  <div className="rounded-lg border p-4 bg-card">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/10 text-primary rounded-md p-2">
+                          <CreditCardIcon className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="font-medium">•••• •••• •••• {savedCard.lastFour}</p>
+                          <p className="text-sm text-muted-foreground">Срок действия: {savedCard.expiryDate}</p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={handleDeleteCard}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Удалить</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-6 text-center flex flex-col items-center justify-center space-y-2">
+                    <CreditCardIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">У вас еще нет сохраненных карт</p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsAddingCard(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Добавить карту
+                    </Button>
+                  </div>
+                )}
+                
+                {isAddingCard && (
+                  <div className="bg-card p-4 rounded-lg border space-y-4">
+                    <h4 className="font-medium">Добавление новой карты</h4>
+                    
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="cardNumber">Номер карты</Label>
+                        <Input 
+                          id="cardNumber" 
+                          placeholder="1234 5678 9012 3456" 
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                          maxLength={19}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="expiryDate">Срок действия</Label>
+                          <Input 
+                            id="expiryDate" 
+                            placeholder="MM/YY" 
+                            value={expiryDate}
+                            onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
+                            maxLength={5}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cvv">CVV</Label>
+                          <Input 
+                            id="cvv" 
+                            placeholder="123" 
+                            value={cvv}
+                            onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 3))}
+                            maxLength={3}
+                            type="password"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsAddingCard(false)}
+                      >
+                        Отмена
+                      </Button>
+                      <Button 
+                        onClick={handleAddCard}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Сохранение...
+                          </>
+                        ) : (
+                          <>Сохранить карту</>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {selectedPlan && (
+                <div className="space-y-4">
+                  <Separator />
+                  
+                  <h3 className="text-lg font-medium">Информация о платеже</h3>
+                  
+                  <div className="grid gap-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Тарифный план:</span>
+                      <span>{selectedPlan}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Период:</span>
+                      <span>{selectedMonths} {
+                        selectedMonths === 1 ? 'месяц' : 
+                        selectedMonths <= 4 ? 'месяца' : 'месяцев'
+                      }</span>
+                    </div>
+                    {discountPercentage > 0 && (
+                      <div className="flex justify-between text-green-600 dark:text-green-400">
+                        <span>Скидка:</span>
+                        <span>{discountPercentage}%</span>
+                      </div>
+                    )}
+                    <Separator className="my-2" />
+                    <div className="flex justify-between font-bold">
+                      <span>Итого к оплате:</span>
+                      <span>{calculateTotalPrice(subscriptionPlans.find(p => p.name === selectedPlan)?.id || "1").toLocaleString('ru-RU')} ₽</span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    className="w-full mt-4"
+                    onClick={handlePayment}
+                    disabled={isProcessing || !savedCard}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Обработка платежа...
+                      </>
+                    ) : (
+                      <>Оплатить</>
+                    )}
+                  </Button>
+                  
+                  {!savedCard && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Добавьте платежную карту для оплаты
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>История платежей</CardTitle>
+              <CardDescription>
+                Информация о всех ваших платежах
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHistory ? (
+                <div className="flex justify-center items-center py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : paymentHistory.length > 0 ? (
+                <div className="border rounded-md">
+                  <div className="grid grid-cols-5 font-medium p-4 border-b bg-muted/40">
+                    <div>Дата</div>
+                    <div>Тариф</div>
+                    <div>Период</div>
+                    <div>Сумма</div>
+                    <div>Статус</div>
+                  </div>
+                  <div className="divide-y">
+                    {paymentHistory.map((payment, index) => (
+                      <div key={index} className="grid grid-cols-5 p-4">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                          {formatDate(payment.date)}
+                        </div>
+                        <div>
+                          {subscriptionPlans.find(p => p.id === payment.tariffId)?.name || 'Неизвестно'}
+                        </div>
+                        <div>
+                          {payment.months} {
+                            payment.months === 1 ? 'месяц' : 
+                            payment.months <= 4 ? 'месяца' : 'месяцев'
+                          }
+                        </div>
+                        <div>{payment.amount.toLocaleString('ru-RU')} ₽</div>
+                        <div>
+                          <Badge className="bg-green-600">Оплачено</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-10 border rounded-lg border-dashed flex flex-col items-center">
+                  <History className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-1">Нет платежей</h3>
+                  <p className="text-muted-foreground">История платежей пока пуста</p>
+                  <Button 
+                    className="mt-4"
+                    onClick={() => setActiveTab("subscription")}
+                  >
+                    Оформить подписку
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default Profile;
+
