@@ -15,43 +15,35 @@ interface CachedData<T> {
   data: T;
   timestamp: number;
   expiresAt: number;
-  isDemo?: boolean; // Маркер для определения, являются ли данные демо
 }
 
 /**
  * Save data to cache with TTL
  */
-export function saveToCache<T>(
-  key: string, 
-  storeId: string, 
-  data: T, 
-  ttl = DEFAULT_CACHE_TTL, 
-  isDemo = false
-): void {
+export function saveToCache<T>(key: string, storeId: string, data: T, ttl = DEFAULT_CACHE_TTL): void {
   const cacheKey = `${key}${storeId}`;
   const now = Date.now();
   
   const cacheData: CachedData<T> = {
     data,
     timestamp: now,
-    expiresAt: now + ttl,
-    isDemo
+    expiresAt: now + ttl
   };
   
   localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-  console.log(`[Cache] Saved ${cacheKey} to cache. ${isDemo ? 'DEMO DATA' : 'REAL DATA'}. Expires in ${ttl/1000} seconds`);
+  console.log(`[Cache] Saved ${cacheKey} to cache. Expires in ${ttl/1000} seconds`);
 }
 
 /**
  * Get data from cache if not expired
  */
-export function getFromCache<T>(key: string, storeId: string): { data: T | null, isDemo: boolean } {
+export function getFromCache<T>(key: string, storeId: string): T | null {
   const cacheKey = `${key}${storeId}`;
   const cachedValue = localStorage.getItem(cacheKey);
   
   if (!cachedValue) {
     console.log(`[Cache] No cache found for ${cacheKey}`);
-    return { data: null, isDemo: false };
+    return null;
   }
   
   try {
@@ -61,20 +53,17 @@ export function getFromCache<T>(key: string, storeId: string): { data: T | null,
     if (now > cachedData.expiresAt) {
       console.log(`[Cache] Cache expired for ${cacheKey}`);
       localStorage.removeItem(cacheKey);
-      return { data: null, isDemo: false };
+      return null;
     }
     
     const ageInSeconds = Math.round((now - cachedData.timestamp) / 1000);
-    console.log(`[Cache] Using cached data for ${cacheKey} (age: ${ageInSeconds}s) ${cachedData.isDemo ? 'DEMO DATA' : 'REAL DATA'}`);
+    console.log(`[Cache] Using cached data for ${cacheKey} (age: ${ageInSeconds}s)`);
     
-    return { 
-      data: cachedData.data, 
-      isDemo: cachedData.isDemo || false 
-    };
+    return cachedData.data;
   } catch (error) {
     console.error(`[Cache] Error parsing cache for ${cacheKey}:`, error);
     localStorage.removeItem(cacheKey);
-    return { data: null, isDemo: false };
+    return null;
   }
 }
 
@@ -150,80 +139,4 @@ export function formatCacheAge(seconds: number | null): string {
   }
   
   return `${Math.floor(seconds / 86400)} дн. назад`;
-}
-
-/**
- * Проверяет, если магазин использует демо-данные
- */
-export function isUsingDemoData(key: string, storeId: string): boolean {
-  const cacheKey = `${key}${storeId}`;
-  const cachedValue = localStorage.getItem(cacheKey);
-  
-  if (!cachedValue) {
-    return false;
-  }
-  
-  try {
-    const cachedData = JSON.parse(cachedValue) as CachedData<any>;
-    return cachedData.isDemo || false;
-  } catch (error) {
-    return false;
-  }
-}
-
-/**
- * Синхронизирует кеш между магазинами
- * Используется для применения данных от одного магазина к другому
- */
-export function syncCacheToAllStores(sourceStoreId: string, targetStoreIds: string[]): void {
-  // Получаем все данные из кеша для исходного магазина
-  const cacheData: Record<string, any> = {};
-  
-  Object.values(CACHE_KEYS).forEach(keyPrefix => {
-    const sourceKey = `${keyPrefix}${sourceStoreId}`;
-    const sourceData = localStorage.getItem(sourceKey);
-    
-    if (sourceData) {
-      cacheData[keyPrefix] = sourceData;
-    }
-  });
-  
-  // Применяем данные ко всем целевым магазинам
-  targetStoreIds.forEach(targetId => {
-    if (targetId === sourceStoreId) return; // Пропускаем исходный магазин
-    
-    Object.entries(cacheData).forEach(([keyPrefix, data]) => {
-      const targetKey = `${keyPrefix}${targetId}`;
-      localStorage.setItem(targetKey, data);
-    });
-    
-    console.log(`[Cache] Synchronized data from store ${sourceStoreId} to ${targetId}`);
-  });
-}
-
-/**
- * Проверяет наличие согласованных данных между разными типами кешей
- * Возвращает true, если все требуемые типы данных присутствуют
- */
-export function hasConsistentData(storeId: string, requiredKeys: string[]): boolean {
-  return requiredKeys.every(key => {
-    const { data } = getFromCache(key, storeId);
-    return data !== null;
-  });
-}
-
-/**
- * Копирует кеш от одного магазина к другому
- */
-export function copyCache(sourceStoreId: string, targetStoreId: string, keys: string[] = Object.values(CACHE_KEYS)): void {
-  keys.forEach(keyPrefix => {
-    const sourceKey = `${keyPrefix}${sourceStoreId}`;
-    const sourceData = localStorage.getItem(sourceKey);
-    
-    if (sourceData) {
-      const targetKey = `${keyPrefix}${targetStoreId}`;
-      localStorage.setItem(targetKey, sourceData);
-      console.log(`[Cache] Copied ${keyPrefix} data from store ${sourceStoreId} to ${targetStoreId}`);
-    }
-  });
 }
