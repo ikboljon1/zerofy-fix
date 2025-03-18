@@ -10,8 +10,7 @@ import {
   Building2,
   HelpCircle,
   Book,
-  Clock,
-  AlertTriangle
+  Clock
 } from 'lucide-react';
 import { 
   fetchAcceptanceCoefficients, 
@@ -41,7 +40,7 @@ import {
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ensureStoreSelectionPersistence, getSelectedStore } from '@/utils/storeUtils';
+import { ensureStoreSelectionPersistence } from '@/utils/storeUtils';
 import { Store as StoreType } from '@/types/store';
 import { fetchAverageDailySalesFromAPI } from '@/components/analytics/data/demoData';
 import LimitExceededMessage from '@/components/analytics/components/LimitExceededMessage';
@@ -52,13 +51,9 @@ import {
   getFromCache, 
   clearCache,
   getCacheAge,
-  formatCacheAge,
-  DEFAULT_CACHE_TTL,
-  isDataDemo,
-  copyCacheBetweenStores
+  formatCacheAge
 } from '@/utils/warehouseCacheUtils';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Warehouses: React.FC = () => {
   const [activeTab, setActiveTab] = useState('inventory');
@@ -90,12 +85,6 @@ const Warehouses: React.FC = () => {
     paidStorage: null as number | null,
     averageSales: null as number | null,
   });
-  
-  const [isDemo, setIsDemo] = useState({
-    remains: false,
-    paidStorage: false,
-    averageSales: false
-  });
 
   const updateLastUpdatedTimes = useCallback((storeId: string) => {
     setLastUpdated({
@@ -105,12 +94,6 @@ const Warehouses: React.FC = () => {
       paidStorage: getCacheAge(CACHE_KEYS.PAID_STORAGE, storeId),
       averageSales: getCacheAge(CACHE_KEYS.AVG_SALES, storeId),
     });
-    
-    setIsDemo({
-      remains: isDataDemo(CACHE_KEYS.REMAINS, storeId),
-      paidStorage: isDataDemo(CACHE_KEYS.PAID_STORAGE, storeId),
-      averageSales: isDataDemo(CACHE_KEYS.AVG_SALES, storeId)
-    });
   }, []);
 
   useEffect(() => {
@@ -119,23 +102,6 @@ const Warehouses: React.FC = () => {
     
     if (selected) {
       setSelectedStore(selected);
-      
-      const otherStores = stores.filter(store => 
-        store.id !== selected.id && 
-        (localStorage.getItem(`${CACHE_KEYS.REMAINS}${store.id}`) || 
-         localStorage.getItem(`${CACHE_KEYS.AVG_SALES}${store.id}`))
-      );
-      
-      if (otherStores.length > 0) {
-        const hasRemainsCache = localStorage.getItem(`${CACHE_KEYS.REMAINS}${selected.id}`);
-        const hasAvgSalesCache = localStorage.getItem(`${CACHE_KEYS.AVG_SALES}${selected.id}`);
-        
-        if (!hasRemainsCache || !hasAvgSalesCache) {
-          copyCacheBetweenStores(otherStores[0].id, selected.id);
-          console.log(`[Warehouses] Скопированы данные кеша из магазина ${otherStores[0].id} в ${selected.id}`);
-        }
-      }
-      
       if (activeTab === 'supplies') {
         loadWarehouses(selected.apiKey, selected.id);
         loadCoefficients(selected.apiKey, selected.id);
@@ -199,10 +165,9 @@ const Warehouses: React.FC = () => {
     }
     
     if (!forceRefresh) {
-      const { data: cachedData, isDemo: isCachedDataDemo } = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
+      const cachedData = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
       if (cachedData) {
         setAverageDailySales(cachedData);
-        setIsDemo(prev => ({ ...prev, averageSales: isCachedDataDemo }));
         setLastUpdated(prev => ({ ...prev, averageSales: getCacheAge(CACHE_KEYS.AVG_SALES, storeId) }));
         return;
       }
@@ -225,8 +190,7 @@ const Warehouses: React.FC = () => {
                   `${Object.keys(data).length} товаров`);
       
       setAverageDailySales(data);
-      saveToCache(CACHE_KEYS.AVG_SALES, storeId, data, DEFAULT_CACHE_TTL, false);
-      setIsDemo(prev => ({ ...prev, averageSales: false }));
+      saveToCache(CACHE_KEYS.AVG_SALES, storeId, data);
       setLastUpdated(prev => ({ ...prev, averageSales: 0 }));
       
     } catch (error: any) {
@@ -292,16 +256,7 @@ const Warehouses: React.FC = () => {
       mockSalesData[item.nmId] = Math.random() * 2;
     });
     setAverageDailySales(mockSalesData);
-    
-    setIsDemo(prev => ({ ...prev, averageSales: true }));
-    saveToCache(CACHE_KEYS.AVG_SALES, selectedStore?.id || '', mockSalesData, DEFAULT_CACHE_TTL, true);
-    
     console.log('[Warehouses] Используем моковые данные для средних продаж:', mockSalesData);
-    
-    toast.warning(
-      'Используются демо-данные для продаж. Реальные данные не получены от API.',
-      { duration: 5000 }
-    );
   };
   
   const formatDate = (date: Date): string => {
@@ -314,7 +269,7 @@ const Warehouses: React.FC = () => {
   const loadWarehouses = async (apiKey: string, storeId: string, forceRefresh = false) => {
     try {
       if (!forceRefresh) {
-        const { data: cachedData } = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
+        const cachedData = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
         if (cachedData) {
           setWbWarehouses(cachedData);
           setLastUpdated(prev => ({ ...prev, warehouses: getCacheAge(CACHE_KEYS.WAREHOUSES, storeId) }));
@@ -339,7 +294,7 @@ const Warehouses: React.FC = () => {
   const loadCoefficients = async (apiKey: string, storeId: string, warehouseId?: number, forceRefresh = false) => {
     try {
       if (!forceRefresh && !warehouseId) {
-        const { data: cachedData } = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
+        const cachedData = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
         if (cachedData) {
           setCoefficients(cachedData);
           setLastUpdated(prev => ({ ...prev, coefficients: getCacheAge(CACHE_KEYS.COEFFICIENTS, storeId) }));
@@ -389,10 +344,9 @@ const Warehouses: React.FC = () => {
     }
     
     if (!forceRefresh) {
-      const { data: cachedData, isDemo: isCachedDataDemo } = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
+      const cachedData = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
       if (cachedData) {
         setWarehouseRemains(cachedData);
-        setIsDemo(prev => ({ ...prev, remains: isCachedDataDemo }));
         setLastUpdated(prev => ({ ...prev, remains: getCacheAge(CACHE_KEYS.REMAINS, storeId) }));
         return;
       }
@@ -404,13 +358,13 @@ const Warehouses: React.FC = () => {
       
       const data = await fetchWarehouseRemains(apiKey, {
         groupByBrand: true,
-        groupByWarehouse: true,
+        groupBySubject: true,
+        groupBySa: true,
         groupBySize: true
       });
       
       setWarehouseRemains(data);
-      saveToCache(CACHE_KEYS.REMAINS, storeId, data, DEFAULT_CACHE_TTL, false);
-      setIsDemo(prev => ({ ...prev, remains: false }));
+      saveToCache(CACHE_KEYS.REMAINS, storeId, data);
       setLastUpdated(prev => ({ ...prev, remains: 0 }));
       
       toast.success('Отчет об остатках на складах успешно загружен');
@@ -422,33 +376,6 @@ const Warehouses: React.FC = () => {
     } catch (error: any) {
       console.error('Ошибка при загрузке остатков на складах:', error);
       toast.error(`Не удалось загрузить отчет: ${error.message || 'Неизвестная ошибка'}`);
-      
-      const demoData: WarehouseRemainItem[] = [];
-      for (let i = 0; i < 20; i++) {
-        demoData.push({
-          nmId: 288457437 + i,
-          name: `Демо-товар ${i+1}`,
-          brand: 'Демо-бренд',
-          category: i % 2 === 0 ? 'Одежда' : 'Обувь',
-          warehouse: `Склад ${i % 5 + 1}`,
-          warehouseId: (i % 5 + 1) * 100,
-          quantity: Math.floor(Math.random() * 50) + 1,
-          volume: Math.random() * 0.5,
-          barcode: `123456${i}`,
-          price: Math.floor(Math.random() * 10000) + 500,
-          size: `${Math.floor(Math.random() * 10) + 30}`
-        });
-      }
-      
-      setWarehouseRemains(demoData);
-      
-      setIsDemo(prev => ({ ...prev, remains: true }));
-      saveToCache(CACHE_KEYS.REMAINS, storeId, demoData, DEFAULT_CACHE_TTL, true);
-      
-      toast.warning(
-        'Используются демо-данные для остатков. Реальные данные не получены от API.',
-        { duration: 5000 }
-      );
     } finally {
       setLoading(prev => ({ ...prev, remains: false }));
     }
@@ -468,10 +395,9 @@ const Warehouses: React.FC = () => {
     
     const cacheKey = `${dateFrom}_${dateTo}`;
     if (!forceRefresh) {
-      const { data: cachedData, isDemo: isCachedDataDemo } = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
+      const cachedData = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
       if (cachedData) {
         setPaidStorageData(cachedData);
-        setIsDemo(prev => ({ ...prev, paidStorage: isCachedDataDemo }));
         setLastUpdated(prev => ({ ...prev, paidStorage: getCacheAge(CACHE_KEYS.PAID_STORAGE, storeId) }));
         return;
       }
@@ -494,8 +420,7 @@ const Warehouses: React.FC = () => {
       }
       
       setPaidStorageData(data);
-      saveToCache(CACHE_KEYS.PAID_STORAGE, storeId, data, DEFAULT_CACHE_TTL, false);
-      setIsDemo(prev => ({ ...prev, paidStorage: false }));
+      saveToCache(CACHE_KEYS.PAID_STORAGE, storeId, data);
       setLastUpdated(prev => ({ ...prev, paidStorage: 0 }));
       
       if (warehouseRemains.length > 0) {
@@ -506,56 +431,6 @@ const Warehouses: React.FC = () => {
     } catch (error: any) {
       console.error('Ошибка при загрузке отчета о платном хранении:', error);
       toast.error(`Не удалось загрузить отчет: ${error.message || 'Неизвестная ошибка'}`);
-      
-      const demoStorageData: PaidStorageItem[] = [];
-      
-      if (warehouseRemains.length > 0) {
-        warehouseRemains.forEach(item => {
-          demoStorageData.push({
-            nmId: item.nmId,
-            warehouseId: item.warehouseId || 0,
-            warehousePrice: Math.random() * 100 + 50,
-            volume: item.volume || Math.random() * 0.5,
-            barcode: item.barcode || '',
-            date: new Date().toISOString(),
-            logWarehouseCoef: 1,
-            warehouse: item.warehouse || '',
-            officeId: 0,
-            subject: '',
-            supplierArticle: '',
-            techSize: item.size || '',
-            quantity: item.quantity || 0
-          });
-        });
-      } else {
-        for (let i = 0; i < 20; i++) {
-          demoStorageData.push({
-            nmId: 288457437 + i,
-            warehouseId: (i % 5 + 1) * 100,
-            warehousePrice: Math.random() * 100 + 50,
-            volume: Math.random() * 0.5,
-            barcode: `123456${i}`,
-            date: new Date().toISOString(),
-            logWarehouseCoef: 1,
-            warehouse: `Склад ${i % 5 + 1}`,
-            officeId: 0,
-            subject: '',
-            supplierArticle: '',
-            techSize: `${Math.floor(Math.random() * 10) + 30}`,
-            quantity: Math.floor(Math.random() * 50) + 1
-          });
-        }
-      }
-      
-      setPaidStorageData(demoStorageData);
-      
-      setIsDemo(prev => ({ ...prev, paidStorage: true }));
-      saveToCache(CACHE_KEYS.PAID_STORAGE, storeId, demoStorageData, DEFAULT_CACHE_TTL, true);
-      
-      toast.warning(
-        'Используются демо-данные для хранения. Реальные данные не получены от API.',
-        { duration: 5000 }
-      );
     } finally {
       setLoading(prev => ({ ...prev, paidStorage: false }));
     }
@@ -599,17 +474,6 @@ const Warehouses: React.FC = () => {
       <Badge variant="outline" className="ml-2 text-xs bg-muted/50">
         <Clock className="h-3 w-3 mr-1" />
         {formatCacheAge(age)}
-      </Badge>
-    );
-  };
-
-  const renderDemoBadge = (isDemoData: boolean) => {
-    if (!isDemoData) return null;
-    
-    return (
-      <Badge className="ml-2 bg-yellow-500 text-white hover:bg-yellow-600">
-        <AlertTriangle className="h-3 w-3 mr-1" />
-        Демо
       </Badge>
     );
   };
@@ -672,19 +536,6 @@ const Warehouses: React.FC = () => {
         </div>
       )}
 
-      {(isDemo.remains || isDemo.paidStorage || isDemo.averageSales) && (
-        <Alert variant="warning" className="mb-4">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Внимание! Используются демо-данные</AlertTitle>
-          <AlertDescription>
-            {isDemo.remains && <div>• Данные об остатках на складах не получены от API и заменены демо-данными.</div>}
-            {isDemo.paidStorage && <div>• Данные о стоимости хранения не получены от API и заменены демо-данными.</div>}
-            {isDemo.averageSales && <div>• Данные о средних продажах не получены от API и заменены демо-данными.</div>}
-            <div className="mt-1">Нажмите "Обновить данные", чтобы попробовать загрузить реальные данные.</div>
-          </AlertDescription>
-        </Alert>
-      )}
-
       <Tabs defaultValue="inventory" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-md">
           <TabsTrigger value="inventory" className="flex items-center justify-center">
@@ -710,7 +561,6 @@ const Warehouses: React.FC = () => {
                     <h2 className="text-lg font-semibold flex items-center">
                       Остатки товаров на складах
                       {renderLastUpdated('remains')}
-                      {renderDemoBadge(isDemo.remains)}
                     </h2>
                     <p className="text-sm text-muted-foreground">Актуальная информация о количестве товаров</p>
                   </div>
@@ -772,7 +622,6 @@ const Warehouses: React.FC = () => {
                         paidStorageData={paidStorageData}
                         averageDailySalesRate={averageDailySales}
                         dailyStorageCost={dailyStorageCosts}
-                        isDemo={isDemo.averageSales || isDemo.paidStorage}
                       />
                     )}
                   </div>
@@ -786,3 +635,142 @@ const Warehouses: React.FC = () => {
           {!selectedStore ? renderNoStoreSelected() : (
             <>
               <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center">
+                  <div>
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      Управление поставками
+                      {renderLastUpdated('coefficients')}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Анализ коэффициентов приемки и выбор оптимального склада
+                    </p>
+                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="ml-1">
+                          <Book className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <div className="space-y-2">
+                          <p className="font-medium">Как работать с разделом "Поставки":</p>
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>Используйте форму для ввода параметров планируемой поставки</li>
+                            <li>Изучите коэффициенты приемки по дням недели для каждого склада</li>
+                            <li>Выбирайте склады с высокими коэффициентами для более быстрой приемки</li>
+                            <li>При отсутствии данных API показываются демо-данные</li>
+                          </ol>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRefreshData}
+                  disabled={loading.warehouses || loading.coefficients}
+                  className="flex items-center gap-2"
+                >
+                  {(loading.warehouses || loading.coefficients) ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Обновить данные
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="space-y-6">
+                  <SupplyForm />
+                </div>
+                
+                <div className="lg:col-span-2">
+                  {loading.coefficients ? (
+                    <Skeleton className="h-[600px] w-full" />
+                  ) : (
+                    <WarehouseCoefficientsDateCard
+                      coefficients={coefficients} 
+                      selectedWarehouseId={selectedWarehouseId}
+                      title="Коэффициенты приемки по дням"
+                      warehouses={wbWarehouses}
+                    />
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="storage" className="space-y-4">
+          {!selectedStore ? renderNoStoreSelected() : (
+            <>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center">
+                  <div>
+                    <h2 className="text-lg font-semibold flex items-center">
+                      Отчет о платном хранении
+                      {renderLastUpdated('paidStorage')}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">Аналитика затрат на хранение товаров</p>
+                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="ml-1">
+                          <Book className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <div className="space-y-2">
+                          <p className="font-medium">Как работать с разделом "Хранение":</p>
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>Здесь отображаются затраты на хранение ваших товаров</li>
+                            <li>Анализируйте дневную стоимость хранения каждого товара</li>
+                            <li>Сопоставляйте стоимость хранения с прибылью от продаж</li>
+                            <li>Выявляйте товары с высокими затратами на хранение</li>
+                            <li>При отсутствии данных API показываются демо-данные</li>
+                          </ol>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRefreshData}
+                  disabled={loading.paidStorage}
+                  className="flex items-center gap-2"
+                >
+                  {loading.paidStorage ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Обновить данные
+                </Button>
+              </div>
+
+              {loading.paidStorage && paidStorageData.length === 0 ? (
+                <Skeleton className="h-[600px] w-full" />
+              ) : (
+                <PaidStorageCostReport 
+                  apiKey={selectedStore.apiKey}
+                  storageData={paidStorageData}
+                  isLoading={loading.paidStorage}
+                  onRefresh={(from: string, to: string) => loadPaidStorageData(selectedStore.apiKey, selectedStore.id, from, to, true)}
+                />
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default Warehouses;
