@@ -10,7 +10,8 @@ import {
   Building2,
   HelpCircle,
   Book,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { 
   fetchAcceptanceCoefficients, 
@@ -51,9 +52,13 @@ import {
   getFromCache, 
   clearCache,
   getCacheAge,
-  formatCacheAge
+  formatCacheAge,
+  isUsingDemoData,
+  copyCache,
+  hasConsistentData
 } from '@/utils/warehouseCacheUtils';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Warehouses: React.FC = () => {
   const [activeTab, setActiveTab] = useState('inventory');
@@ -85,6 +90,12 @@ const Warehouses: React.FC = () => {
     paidStorage: null as number | null,
     averageSales: null as number | null,
   });
+  const [dataSource, setDataSource] = useState({
+    remains: false,
+    paidStorage: false,
+    averageSales: false
+  });
+  const [allStores, setAllStores] = useState<StoreType[]>([]);
 
   const updateLastUpdatedTimes = useCallback((storeId: string) => {
     setLastUpdated({
@@ -94,14 +105,43 @@ const Warehouses: React.FC = () => {
       paidStorage: getCacheAge(CACHE_KEYS.PAID_STORAGE, storeId),
       averageSales: getCacheAge(CACHE_KEYS.AVG_SALES, storeId),
     });
+    
+    setDataSource({
+      remains: isUsingDemoData(CACHE_KEYS.REMAINS, storeId),
+      paidStorage: isUsingDemoData(CACHE_KEYS.PAID_STORAGE, storeId),
+      averageSales: isUsingDemoData(CACHE_KEYS.AVG_SALES, storeId)
+    });
   }, []);
 
   useEffect(() => {
     const stores = ensureStoreSelectionPersistence();
+    setAllStores(stores);
     const selected = stores.find(store => store.isSelected);
     
     if (selected) {
       setSelectedStore(selected);
+      
+      const hasData = hasConsistentData(selected.id, [
+        CACHE_KEYS.REMAINS, 
+        CACHE_KEYS.PAID_STORAGE, 
+        CACHE_KEYS.AVG_SALES
+      ]);
+      
+      if (!hasData) {
+        const storeWithData = stores.find(store => 
+          hasConsistentData(store.id, [
+            CACHE_KEYS.REMAINS, 
+            CACHE_KEYS.PAID_STORAGE, 
+            CACHE_KEYS.AVG_SALES
+          ])
+        );
+        
+        if (storeWithData) {
+          console.log(`[Warehouses] Копирование данных с магазина ${storeWithData.id} на ${selected.id}`);
+          copyCache(storeWithData.id, selected.id);
+        }
+      }
+      
       if (activeTab === 'supplies') {
         loadWarehouses(selected.apiKey, selected.id);
         loadCoefficients(selected.apiKey, selected.id);
@@ -165,9 +205,10 @@ const Warehouses: React.FC = () => {
     }
     
     if (!forceRefresh) {
-      const cachedData = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
+      const { data: cachedData, isDemo } = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
       if (cachedData) {
         setAverageDailySales(cachedData);
+        setDataSource(prev => ({ ...prev, averageSales: isDemo }));
         setLastUpdated(prev => ({ ...prev, averageSales: getCacheAge(CACHE_KEYS.AVG_SALES, storeId) }));
         return;
       }
@@ -190,12 +231,21 @@ const Warehouses: React.FC = () => {
                   `${Object.keys(data).length} товаров`);
       
       setAverageDailySales(data);
-      saveToCache(CACHE_KEYS.AVG_SALES, storeId, data);
+      saveToCache(CACHE_KEYS.AVG_SALES, storeId, data, DEFAULT_CACHE_TTL, false);
+      setDataSource(prev => ({ ...prev, averageSales: false }));
       setLastUpdated(prev => ({ ...prev, averageSales: 0 }));
       
     } catch (error: any) {
       console.error('[Warehouses] Ошибка при загрузке средних продаж:', error);
-      generateMockAverageSales();
+      const mockData = generateMockAverageSales(warehouseRemains);
+      setAverageDailySales(mockData);
+      saveToCache(CACHE_KEYS.AVG_SALES, storeId, mockData, DEFAULT_CACHE_TTL, true);
+      setDataSource(prev => ({ ...prev, averageSales: true }));
+      setLastUpdated(prev => ({ ...prev, averageSales: 0 }));
+      
+      toast.warning('Используются демо-данные для средних продаж', {
+        description: 'Не удалось получить реальные данные. Показаны примерные значения.'
+      });
     } finally {
       setLoading(prev => ({ ...prev, averageSales: false }));
     }
@@ -250,13 +300,13 @@ const Warehouses: React.FC = () => {
     }
   };
   
-  const generateMockAverageSales = () => {
+  const generateMockAverageSales = (items: WarehouseRemainItem[]): Record<number, number> => {
     const mockSalesData: Record<number, number> = {};
-    warehouseRemains.forEach(item => {
-      mockSalesData[item.nmId] = Math.random() * 2;
+    items.forEach(item => {
+      mockSalesData[item.nmId] = 0.1 + Math.random() * 1.9;
     });
-    setAverageDailySales(mockSalesData);
     console.log('[Warehouses] Используем моковые данные для средних продаж:', mockSalesData);
+    return mockSalesData;
   };
   
   const formatDate = (date: Date): string => {
@@ -269,7 +319,7 @@ const Warehouses: React.FC = () => {
   const loadWarehouses = async (apiKey: string, storeId: string, forceRefresh = false) => {
     try {
       if (!forceRefresh) {
-        const cachedData = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
+        const { data: cachedData } = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
         if (cachedData) {
           setWbWarehouses(cachedData);
           setLastUpdated(prev => ({ ...prev, warehouses: getCacheAge(CACHE_KEYS.WAREHOUSES, storeId) }));
@@ -294,7 +344,7 @@ const Warehouses: React.FC = () => {
   const loadCoefficients = async (apiKey: string, storeId: string, warehouseId?: number, forceRefresh = false) => {
     try {
       if (!forceRefresh && !warehouseId) {
-        const cachedData = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
+        const { data: cachedData } = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
         if (cachedData) {
           setCoefficients(cachedData);
           setLastUpdated(prev => ({ ...prev, coefficients: getCacheAge(CACHE_KEYS.COEFFICIENTS, storeId) }));
@@ -344,9 +394,10 @@ const Warehouses: React.FC = () => {
     }
     
     if (!forceRefresh) {
-      const cachedData = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
+      const { data: cachedData, isDemo } = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
       if (cachedData) {
         setWarehouseRemains(cachedData);
+        setDataSource(prev => ({ ...prev, remains: isDemo }));
         setLastUpdated(prev => ({ ...prev, remains: getCacheAge(CACHE_KEYS.REMAINS, storeId) }));
         return;
       }
@@ -364,7 +415,8 @@ const Warehouses: React.FC = () => {
       });
       
       setWarehouseRemains(data);
-      saveToCache(CACHE_KEYS.REMAINS, storeId, data);
+      saveToCache(CACHE_KEYS.REMAINS, storeId, data, DEFAULT_CACHE_TTL, false);
+      setDataSource(prev => ({ ...prev, remains: false }));
       setLastUpdated(prev => ({ ...prev, remains: 0 }));
       
       toast.success('Отчет об остатках на складах успешно загружен');
@@ -376,6 +428,21 @@ const Warehouses: React.FC = () => {
     } catch (error: any) {
       console.error('Ошибка при загрузке остатков на складах:', error);
       toast.error(`Не удалось загрузить отчет: ${error.message || 'Неизвестная ошибка'}`);
+      
+      const mockData: WarehouseRemainItem[] = [
+        { nmId: 123456, quantity: 50, subject: 'Футболка', brand: 'Brand', volume: 0.5, price: 1500 },
+        { nmId: 234567, quantity: 30, subject: 'Джинсы', brand: 'Brand', volume: 1.2, price: 3000 },
+        { nmId: 345678, quantity: 20, subject: 'Куртка', brand: 'Brand', volume: 2.0, price: 5000 },
+      ];
+      
+      setWarehouseRemains(mockData);
+      saveToCache(CACHE_KEYS.REMAINS, storeId, mockData, DEFAULT_CACHE_TTL, true);
+      setDataSource(prev => ({ ...prev, remains: true }));
+      setLastUpdated(prev => ({ ...prev, remains: 0 }));
+      
+      toast.warning('Используются демо-данные для остатков на складах', {
+        description: 'Не удалось получить реальные данные. Показаны примерные значения.'
+      });
     } finally {
       setLoading(prev => ({ ...prev, remains: false }));
     }
@@ -393,11 +460,11 @@ const Warehouses: React.FC = () => {
       return;
     }
     
-    const cacheKey = `${dateFrom}_${dateTo}`;
     if (!forceRefresh) {
-      const cachedData = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
+      const { data: cachedData, isDemo } = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
       if (cachedData) {
         setPaidStorageData(cachedData);
+        setDataSource(prev => ({ ...prev, paidStorage: isDemo }));
         setLastUpdated(prev => ({ ...prev, paidStorage: getCacheAge(CACHE_KEYS.PAID_STORAGE, storeId) }));
         return;
       }
@@ -420,7 +487,8 @@ const Warehouses: React.FC = () => {
       }
       
       setPaidStorageData(data);
-      saveToCache(CACHE_KEYS.PAID_STORAGE, storeId, data);
+      saveToCache(CACHE_KEYS.PAID_STORAGE, storeId, data, DEFAULT_CACHE_TTL, false);
+      setDataSource(prev => ({ ...prev, paidStorage: false }));
       setLastUpdated(prev => ({ ...prev, paidStorage: 0 }));
       
       if (warehouseRemains.length > 0) {
@@ -431,6 +499,23 @@ const Warehouses: React.FC = () => {
     } catch (error: any) {
       console.error('Ошибка при загрузке отчета о платном хранении:', error);
       toast.error(`Не удалось загрузить отчет: ${error.message || 'Неизвестная ошибка'}`);
+      
+      const mockData: PaidStorageItem[] = warehouseRemains.map(item => ({
+        nmId: item.nmId,
+        warehousePrice: item.price * 0.05,
+        volume: item.volume || 0.5,
+        barcode: `${item.nmId}`,
+        quantity: item.quantity || 10
+      }));
+      
+      setPaidStorageData(mockData);
+      saveToCache(CACHE_KEYS.PAID_STORAGE, storeId, mockData, DEFAULT_CACHE_TTL, true);
+      setDataSource(prev => ({ ...prev, paidStorage: true }));
+      setLastUpdated(prev => ({ ...prev, paidStorage: 0 }));
+      
+      toast.warning('Используются демо-данные для платного хранения', {
+        description: 'Не удалось получить реальные данные. Показаны примерные значения.'
+      });
     } finally {
       setLoading(prev => ({ ...prev, paidStorage: false }));
     }
@@ -450,6 +535,26 @@ const Warehouses: React.FC = () => {
       loadWarehouseRemains(selectedStore.apiKey, selectedStore.id, true);
       loadAverageDailySales(selectedStore.apiKey, selectedStore.id, true);
       loadPaidStorageData(selectedStore.apiKey, selectedStore.id, undefined, undefined, true);
+      
+      setTimeout(() => {
+        const otherStoreIds = allStores
+          .filter(store => store.id !== selectedStore.id)
+          .map(store => store.id);
+          
+        if (otherStoreIds.length > 0) {
+          otherStoreIds.forEach(targetStoreId => {
+            copyCache(selectedStore.id, targetStoreId, [
+              CACHE_KEYS.REMAINS,
+              CACHE_KEYS.AVG_SALES,
+              CACHE_KEYS.PAID_STORAGE
+            ]);
+          });
+          
+          toast.success('Данные синхронизированы между всеми магазинами', {
+            description: 'Теперь другие магазины будут использовать те же данные'
+          });
+        }
+      }, 1000);
     } else if (activeTab === 'supplies') {
       clearCache(CACHE_KEYS.WAREHOUSES, selectedStore.id);
       clearCache(CACHE_KEYS.COEFFICIENTS, selectedStore.id);
@@ -476,6 +581,18 @@ const Warehouses: React.FC = () => {
         {formatCacheAge(age)}
       </Badge>
     );
+  };
+  
+  const renderDataSourceBadge = (key: keyof typeof dataSource) => {
+    if (dataSource[key]) {
+      return (
+        <Badge className="ml-2 bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          Демо данные
+        </Badge>
+      );
+    }
+    return null;
   };
 
   const renderNoStoreSelected = () => (
@@ -535,6 +652,17 @@ const Warehouses: React.FC = () => {
           />
         </div>
       )}
+      
+      {activeTab === 'inventory' && (dataSource.remains || dataSource.averageSales || dataSource.paidStorage) && (
+        <Alert variant="warning" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Используются демо-данные</AlertTitle>
+          <AlertDescription>
+            Некоторые данные не удалось получить с API и заменены на демо-данные для отображения. 
+            Для получения реальных данных попробуйте обновить информацию.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="inventory" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-md">
@@ -561,6 +689,7 @@ const Warehouses: React.FC = () => {
                     <h2 className="text-lg font-semibold flex items-center">
                       Остатки товаров на складах
                       {renderLastUpdated('remains')}
+                      {renderDataSourceBadge('remains')}
                     </h2>
                     <p className="text-sm text-muted-foreground">Актуальная информация о количестве товаров</p>
                   </div>
@@ -614,6 +743,16 @@ const Warehouses: React.FC = () => {
                   />
                   
                   <div className="mt-8">
+                    <div className="flex items-center mb-2">
+                      <h2 className="text-lg font-semibold">
+                        Анализ рентабельности хранения
+                      </h2>
+                      <div className="flex items-center ml-3 space-x-2">
+                        {renderDataSourceBadge('paidStorage')}
+                        {renderDataSourceBadge('averageSales')}
+                      </div>
+                    </div>
+                    
                     {loading.paidStorage ? (
                       <Skeleton className="h-[400px] w-full" />
                     ) : (
@@ -714,6 +853,7 @@ const Warehouses: React.FC = () => {
                     <h2 className="text-lg font-semibold flex items-center">
                       Отчет о платном хранении
                       {renderLastUpdated('paidStorage')}
+                      {renderDataSourceBadge('paidStorage')}
                     </h2>
                     <p className="text-sm text-muted-foreground">Аналитика затрат на хранение товаров</p>
                   </div>
@@ -763,6 +903,7 @@ const Warehouses: React.FC = () => {
                   storageData={paidStorageData}
                   isLoading={loading.paidStorage}
                   onRefresh={(from: string, to: string) => loadPaidStorageData(selectedStore.apiKey, selectedStore.id, from, to, true)}
+                  isDemo={dataSource.paidStorage}
                 />
               )}
             </>
