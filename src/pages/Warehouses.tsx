@@ -166,8 +166,8 @@ const Warehouses: React.FC = () => {
     
     if (!forceRefresh) {
       const cachedData = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
-      if (cachedData) {
-        setAverageDailySales(cachedData);
+      if (cachedData.data) {
+        setAverageDailySales(cachedData.data);
         setLastUpdated(prev => ({ ...prev, averageSales: getCacheAge(CACHE_KEYS.AVG_SALES, storeId) }));
         return;
       }
@@ -270,8 +270,8 @@ const Warehouses: React.FC = () => {
     try {
       if (!forceRefresh) {
         const cachedData = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
-        if (cachedData) {
-          setWbWarehouses(cachedData);
+        if (cachedData.data) {
+          setWbWarehouses(cachedData.data);
           setLastUpdated(prev => ({ ...prev, warehouses: getCacheAge(CACHE_KEYS.WAREHOUSES, storeId) }));
           return;
         }
@@ -295,8 +295,8 @@ const Warehouses: React.FC = () => {
     try {
       if (!forceRefresh && !warehouseId) {
         const cachedData = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
-        if (cachedData) {
-          setCoefficients(cachedData);
+        if (cachedData.data) {
+          setCoefficients(cachedData.data);
           setLastUpdated(prev => ({ ...prev, coefficients: getCacheAge(CACHE_KEYS.COEFFICIENTS, storeId) }));
           return;
         }
@@ -345,8 +345,8 @@ const Warehouses: React.FC = () => {
     
     if (!forceRefresh) {
       const cachedData = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
-      if (cachedData) {
-        setWarehouseRemains(cachedData);
+      if (cachedData.data) {
+        setWarehouseRemains(cachedData.data);
         setLastUpdated(prev => ({ ...prev, remains: getCacheAge(CACHE_KEYS.REMAINS, storeId) }));
         return;
       }
@@ -396,8 +396,8 @@ const Warehouses: React.FC = () => {
     const cacheKey = `${dateFrom}_${dateTo}`;
     if (!forceRefresh) {
       const cachedData = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
-      if (cachedData) {
-        setPaidStorageData(cachedData);
+      if (cachedData.data) {
+        setPaidStorageData(cachedData.data);
         setLastUpdated(prev => ({ ...prev, paidStorage: getCacheAge(CACHE_KEYS.PAID_STORAGE, storeId) }));
         return;
       }
