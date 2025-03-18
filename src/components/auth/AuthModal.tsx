@@ -112,7 +112,11 @@ const AuthModal = ({ open, onClose, initialMode = 'login', resetToken, resetEmai
           />
         </TabsContent>
         <TabsContent value="register">
-          <RegisterForm onSuccess={onClose} />
+          <RegisterForm 
+            onSuccessfulRegister={() => {}} 
+            onLoginClick={() => setActiveTab('login')}
+            onSuccess={onClose} 
+          />
         </TabsContent>
       </Tabs>
     );

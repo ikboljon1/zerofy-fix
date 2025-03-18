@@ -32,9 +32,10 @@ const registerSchema = z.object({
 interface RegisterFormProps {
   onLoginClick: () => void;
   onSuccessfulRegister: (userData: any) => void;
+  onSuccess?: () => void; // Added this prop to match usage in AuthModal
 }
 
-const RegisterForm = ({ onLoginClick, onSuccessfulRegister }: RegisterFormProps) => {
+const RegisterForm = ({ onLoginClick, onSuccessfulRegister, onSuccess }: RegisterFormProps) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const { toast } = useToast();
   
@@ -88,6 +89,8 @@ const RegisterForm = ({ onLoginClick, onSuccessfulRegister }: RegisterFormProps)
         });
         
         onSuccessfulRegister(result.user);
+        // Call the optional onSuccess if provided
+        if (onSuccess) onSuccess();
       } else {
         toast({
           title: "Ошибка регистрации",

@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string;
@@ -984,7 +983,84 @@ export const sendEmail = async (
   }
 };
 
-// Additional functions needed based on the error messages
+export const getSubscriptionStatus = (user: User): SubscriptionData => {
+  const now = new Date();
+  
+  // Check for trial period
+  if (user.isInTrial && user.trialEndDate) {
+    const trialEnd = new Date(user.trialEndDate);
+    if (trialEnd > now) {
+      const diffTime = Math.abs(trialEnd.getTime() - now.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return {
+        status: 'trial',
+        endDate: user.trialEndDate,
+        daysRemaining: diffDays,
+        tariffId: user.tariffId
+      };
+    }
+  }
+  
+  // Check for active subscription
+  if (user.isSubscriptionActive && user.subscriptionEndDate) {
+    const subEnd = new Date(user.subscriptionEndDate);
+    if (subEnd > now) {
+      const diffTime = Math.abs(subEnd.getTime() - now.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return {
+        status: 'active',
+        endDate: user.subscriptionEndDate,
+        daysRemaining: diffDays,
+        tariffId: user.tariffId
+      };
+    }
+  }
+  
+  // If no active subscription or trial period
+  return {
+    status: 'expired',
+    tariffId: user.tariffId
+  };
+};
+
+export const addPaymentRecord = async (
+  userId: string, 
+  tariffId: string,
+  amount: number,
+  months: number
+): Promise<PaymentHistoryItem> => {
+  try {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 700));
+    
+    // Get existing payments
+    const payments = await getPaymentHistory(userId);
+    
+    // Create new payment record
+    const newPayment: PaymentHistoryItem = {
+      id: Date.now().toString(),
+      date: new Date().toISOString(),
+      amount: amount,
+      description: `Оплата тарифа на ${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`,
+      status: "completed",
+      tariff: tariffId,
+      period: `${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`
+    };
+    
+    // Add to existing payments
+    const updatedPayments = [...payments, newPayment];
+    
+    // Save to localStorage
+    localStorage.setItem(`payment_history_${userId}`, JSON.stringify(updatedPayments));
+    
+    return newPayment;
+  } catch (error) {
+    console.error("Error adding payment record:", error);
+    throw error;
+  }
+};
 
 export const changePassword = async (
   userId: string,
@@ -1055,6 +1131,7 @@ export const requestPasswordReset = async (
 };
 
 export const resetPassword = async (
+  email: string,
   token: string,
   newPassword: string
 ): Promise<{ success: boolean; message: string }> => {
@@ -1063,7 +1140,7 @@ export const resetPassword = async (
     await new Promise(resolve => setTimeout(resolve, 800));
     
     // In a real application, you would verify the token and update the password
-    console.log(`Сброс пароля с токеном ${token}`);
+    console.log(`Сброс пароля для ${email} с токеном ${token}`);
     
     return { 
       success: true, 
@@ -1093,35 +1170,5 @@ export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryI
   } catch (error) {
     console.error("Error fetching payment history:", error);
     return [];
-  }
-};
-
-export const addPaymentRecord = async (
-  userId: string, 
-  payment: Omit<PaymentHistoryItem, 'id'>
-): Promise<PaymentHistoryItem> => {
-  try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 700));
-    
-    // Get existing payments
-    const payments = await getPaymentHistory(userId);
-    
-    // Create new payment record
-    const newPayment: PaymentHistoryItem = {
-      id: Date.now().toString(),
-      ...payment
-    };
-    
-    // Add to existing payments
-    const updatedPayments = [...payments, newPayment];
-    
-    // Save to localStorage
-    localStorage.setItem(`payment_history_${userId}`, JSON.stringify(updatedPayments));
-    
-    return newPayment;
-  } catch (error) {
-    console.error("Error adding payment record:", error);
-    throw error;
   }
 };
