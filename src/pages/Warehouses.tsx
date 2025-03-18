@@ -165,9 +165,9 @@ const Warehouses: React.FC = () => {
     }
     
     if (!forceRefresh) {
-      const cachedData = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
-      if (cachedData.data) {
-        setAverageDailySales(cachedData.data);
+      const cachedResult = getFromCache<Record<number, number>>(CACHE_KEYS.AVG_SALES, storeId);
+      if (cachedResult.data) {
+        setAverageDailySales(cachedResult.data);
         setLastUpdated(prev => ({ ...prev, averageSales: getCacheAge(CACHE_KEYS.AVG_SALES, storeId) }));
         return;
       }
@@ -269,9 +269,9 @@ const Warehouses: React.FC = () => {
   const loadWarehouses = async (apiKey: string, storeId: string, forceRefresh = false) => {
     try {
       if (!forceRefresh) {
-        const cachedData = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
-        if (cachedData.data) {
-          setWbWarehouses(cachedData.data);
+        const cachedResult = getFromCache<WBWarehouse[]>(CACHE_KEYS.WAREHOUSES, storeId);
+        if (cachedResult.data) {
+          setWbWarehouses(cachedResult.data);
           setLastUpdated(prev => ({ ...prev, warehouses: getCacheAge(CACHE_KEYS.WAREHOUSES, storeId) }));
           return;
         }
@@ -294,9 +294,9 @@ const Warehouses: React.FC = () => {
   const loadCoefficients = async (apiKey: string, storeId: string, warehouseId?: number, forceRefresh = false) => {
     try {
       if (!forceRefresh && !warehouseId) {
-        const cachedData = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
-        if (cachedData.data) {
-          setCoefficients(cachedData.data);
+        const cachedResult = getFromCache<WarehouseCoefficient[]>(CACHE_KEYS.COEFFICIENTS, storeId);
+        if (cachedResult.data) {
+          setCoefficients(cachedResult.data);
           setLastUpdated(prev => ({ ...prev, coefficients: getCacheAge(CACHE_KEYS.COEFFICIENTS, storeId) }));
           return;
         }
@@ -344,9 +344,9 @@ const Warehouses: React.FC = () => {
     }
     
     if (!forceRefresh) {
-      const cachedData = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
-      if (cachedData.data) {
-        setWarehouseRemains(cachedData.data);
+      const cachedResult = getFromCache<WarehouseRemainItem[]>(CACHE_KEYS.REMAINS, storeId);
+      if (cachedResult.data) {
+        setWarehouseRemains(cachedResult.data);
         setLastUpdated(prev => ({ ...prev, remains: getCacheAge(CACHE_KEYS.REMAINS, storeId) }));
         return;
       }
@@ -395,9 +395,9 @@ const Warehouses: React.FC = () => {
     
     const cacheKey = `${dateFrom}_${dateTo}`;
     if (!forceRefresh) {
-      const cachedData = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
-      if (cachedData.data) {
-        setPaidStorageData(cachedData.data);
+      const cachedResult = getFromCache<PaidStorageItem[]>(CACHE_KEYS.PAID_STORAGE, storeId);
+      if (cachedResult.data) {
+        setPaidStorageData(cachedResult.data);
         setLastUpdated(prev => ({ ...prev, paidStorage: getCacheAge(CACHE_KEYS.PAID_STORAGE, storeId) }));
         return;
       }
