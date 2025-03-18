@@ -3,8 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Globe } from "lucide-react";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import PasswordResetRequestForm from "./PasswordResetRequestForm";
@@ -19,41 +17,13 @@ interface AuthModalProps {
   resetEmail?: string;
 }
 
-// Объект с текстами для разных языков
-const localization = {
-  ru: {
-    welcome: "Добро пожаловать!",
-    join: "Присоединяйтесь к Zerofy",
-    resetPassword: "Восстановление пароля",
-    newPassword: "Создание нового пароля",
-    login: "Войти",
-    register: "Регистрация",
-    loginDescription: "Вход в систему",
-    registerDescription: "Регистрация нового аккаунта",
-    language: "Язык"
-  },
-  en: {
-    welcome: "Welcome!",
-    join: "Join Zerofy",
-    resetPassword: "Reset Password",
-    newPassword: "Create New Password",
-    login: "Log In",
-    register: "Register",
-    loginDescription: "Sign in to your account",
-    registerDescription: "Create a new account",
-    language: "Language"
-  }
-};
-
 const AuthModal = ({ open, onClose, initialMode = 'login', resetToken, resetEmail }: AuthModalProps) => {
   const [activeTab, setActiveTab] = useState<string>(initialMode);
   const [resetMode, setResetMode] = useState<'request' | 'reset' | null>(
     resetToken && resetEmail ? 'reset' : null
   );
   const [emailForReset, setEmailForReset] = useState<string>(resetEmail || '');
-  const [language, setLanguage] = useState<'ru' | 'en'>('ru'); // Русский язык по умолчанию
   const navigate = useNavigate();
-  const texts = localization[language];
 
   // Проверяем авторизацию при открытии модального окна
   useEffect(() => {
@@ -106,10 +76,6 @@ const AuthModal = ({ open, onClose, initialMode = 'login', resetToken, resetEmai
     setResetMode(null);
     setActiveTab('login');
   };
-  
-  const handleLanguageChange = (value: string) => {
-    setLanguage(value as 'ru' | 'en');
-  };
 
   const renderContent = () => {
     if (resetMode === 'request') {
@@ -134,8 +100,8 @@ const AuthModal = ({ open, onClose, initialMode = 'login', resetToken, resetEmai
     return (
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="login">{texts.login}</TabsTrigger>
-          <TabsTrigger value="register">{texts.register}</TabsTrigger>
+          <TabsTrigger value="login">Войти</TabsTrigger>
+          <TabsTrigger value="register">Регистрация</TabsTrigger>
         </TabsList>
         <TabsContent value="login">
           <LoginForm 
@@ -161,32 +127,18 @@ const AuthModal = ({ open, onClose, initialMode = 'login', resetToken, resetEmai
   return (
     <Dialog open={open} onOpenChange={onClose} modal={true}>
       <DialogContent className="sm:max-w-[425px]" onPointerDownOutside={(e) => e.preventDefault()}>
-        <div className="flex justify-end mb-2">
-          <Select value={language} onValueChange={handleLanguageChange}>
-            <SelectTrigger className="w-[120px]">
-              <span className="flex items-center">
-                <Globe className="h-4 w-4 mr-2" />
-                {texts.language}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ru">Русский</SelectItem>
-              <SelectItem value="en">English</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-bold">
             {resetMode === 'request' 
-              ? texts.resetPassword
+              ? "Восстановление пароля"
               : resetMode === 'reset'
-                ? texts.newPassword
+                ? "Создание нового пароля"
                 : activeTab === 'login' 
-                  ? texts.welcome 
-                  : texts.join}
+                  ? "Добро пожаловать!" 
+                  : "Присоединяйтесь к Zerofy"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {activeTab === 'login' ? texts.loginDescription : texts.registerDescription}
+            {activeTab === 'login' ? "Вход в систему" : "Регистрация нового аккаунта"}
           </DialogDescription>
         </DialogHeader>
         {renderContent()}
