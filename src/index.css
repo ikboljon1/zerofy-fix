@@ -134,6 +134,18 @@
   transform: translateY(-2px);
 }
 
+/* Analytics card styles for light mode */
+.light .analytics-card {
+  background-color: #F6F9FD; 
+  border-color: rgba(220, 230, 245, 0.5);
+  box-shadow: 0 2px 8px rgba(160, 190, 230, 0.1);
+}
+
+.light .analytics-card:hover {
+  box-shadow: 0 4px 12px rgba(160, 190, 230, 0.15);
+  transform: translateY(-2px);
+}
+
 /* Specific color for pie chart cards in light mode */
 .light .chart-card {
   background-color: #F6F9FD;

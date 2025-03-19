@@ -52,7 +52,7 @@ const PieChartCard = ({
   // Определяем, нужно ли показывать информационное сообщение о применении
   const showApplyInformation = title.includes("реклам") || title.includes("штраф") || title.includes("удержани") || title.includes("Удержания");
   
-  return <Card className="p-3 light:bg-[#F6F9FD] light:hover:shadow-md light:transition-all light:duration-300">
+  return <Card className="p-3 analytics-card chart-card">
       <div className="flex items-center justify-between mb-3 rounded-none">
         <h3 className="text-base font-medium">{title}</h3>
         <div className="bg-primary/10 dark:bg-primary/20 p-1 rounded-md">
