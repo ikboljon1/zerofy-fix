@@ -61,12 +61,22 @@ const OrdersAnalytics: React.FC<OrdersAnalyticsProps> = ({
     }
   };
   
+  const getCardVariant = (rank: number) => {
+    switch (rank % 4) {
+      case 0: return "card-pink";
+      case 1: return "card-blue";
+      case 2: return "card-amber";
+      case 3: return "card-emerald";
+      default: return "card-pink";
+    }
+  };
+  
   if (!orders.length) {
     return null;
   }
   
   return (
-    <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-white to-amber-50/40 dark:from-gray-900 dark:to-amber-950/30">
+    <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-white to-amber-50/40 dark:from-gray-900 dark:to-amber-950/30 hover:shadow-2xl transition-all duration-300">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100/80 dark:bg-amber-900/50 shadow-inner">
@@ -82,11 +92,11 @@ const OrdersAnalytics: React.FC<OrdersAnalyticsProps> = ({
           {topSellingProducts.map((product) => (
             <div 
               key={product.article} 
-              className={`relative flex items-start gap-3 p-3 rounded-lg overflow-hidden border ${
+              className={`relative flex items-start gap-3 p-3 rounded-lg overflow-hidden border transition-all duration-300 ${
                 product.rank <= 3 
                   ? 'border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 dark:border-amber-800/30' 
-                  : 'border-gray-200 bg-white/80 dark:bg-gray-800/30 dark:border-gray-700/30'
-              }`}
+                  : `border-gray-200 ${getCardVariant(product.rank)} dark:bg-gray-800/30 dark:border-gray-700/30`
+              } hover:shadow-lg hover:-translate-y-1`}
             >
               <div className={`absolute top-0 right-0 w-16 h-16 ${
                 product.rank <= 3 ? 'opacity-10' : 'opacity-5'
@@ -119,11 +129,11 @@ const OrdersAnalytics: React.FC<OrdersAnalyticsProps> = ({
                 <p className="text-xs text-muted-foreground mt-1">Артикул: {product.article}</p>
                 
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div className="bg-white/80 dark:bg-gray-800/50 rounded p-1 text-center">
+                  <div className="bg-white/80 dark:bg-gray-800/50 rounded p-1 text-center backdrop-blur-sm">
                     <p className="text-xs text-muted-foreground">Заказов</p>
                     <p className="font-semibold">{product.count}</p>
                   </div>
-                  <div className="bg-white/80 dark:bg-gray-800/50 rounded p-1 text-center">
+                  <div className="bg-white/80 dark:bg-gray-800/50 rounded p-1 text-center backdrop-blur-sm">
                     <p className="text-xs text-muted-foreground">Доход</p>
                     <p className="font-semibold">{formatCurrency(product.revenue)}</p>
                   </div>
