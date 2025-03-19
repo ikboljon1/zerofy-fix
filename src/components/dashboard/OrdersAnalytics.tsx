@@ -76,13 +76,13 @@ const OrdersAnalytics: React.FC<OrdersAnalyticsProps> = ({
   }
   
   return (
-    <Card className="overflow-hidden border-0 shadow-xl analytics-card dark:from-gray-900 dark:to-amber-950/30 hover:shadow-2xl transition-all duration-300">
+    <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-white to-amber-50/40 dark:from-gray-900 dark:to-amber-950/30 hover:shadow-2xl transition-all duration-300">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100/80 dark:bg-amber-900/50 shadow-inner">
             <Trophy className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <span className="text-amber-700 dark:text-amber-400 font-bold">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-700 to-yellow-600 dark:from-amber-400 dark:to-yellow-300 font-bold">
             Рейтинг товаров по популярности
           </span>
         </CardTitle>
@@ -94,7 +94,7 @@ const OrdersAnalytics: React.FC<OrdersAnalyticsProps> = ({
               key={product.article} 
               className={`relative flex items-start gap-3 p-3 rounded-lg overflow-hidden border transition-all duration-300 ${
                 product.rank <= 3 
-                  ? 'border-amber-200 bg-amber-50 dark:from-amber-950/30 dark:to-yellow-950/30 dark:border-amber-800/30' 
+                  ? 'border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 dark:border-amber-800/30' 
                   : `border-gray-200 ${getCardVariant(product.rank)} dark:bg-gray-800/30 dark:border-gray-700/30`
               } hover:shadow-lg hover:-translate-y-1`}
             >
