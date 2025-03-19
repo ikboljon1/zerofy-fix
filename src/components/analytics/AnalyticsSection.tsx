@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { subDays } from "date-fns";
-import { AlertCircle, Target, PackageX, Tag, Loader2, BadgePercent } from "lucide-react";
+import { AlertCircle, Target, PackageX, Tag, Loader2, BadgePercent, HelpCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
@@ -13,6 +13,7 @@ import PieChartCard from "./components/PieChartCard";
 import ExpenseBreakdown from "./components/ExpenseBreakdown";
 import ProductList from "./components/ProductList";
 import LimitExceededMessage from "./components/LimitExceededMessage";
+import AnalyticsGuide from "./components/AnalyticsGuide";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { fetchWildberriesStats } from "@/services/wildberriesApi";
@@ -137,6 +138,7 @@ const AnalyticsSection = () => {
   const [showAIAnalysis, setShowAIAnalysis] = useState<boolean>(false);
   const [dataSource, setDataSource] = useState<'cache' | 'server' | 'error'>('cache');
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [showGuide, setShowGuide] = useState(false);
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
@@ -221,7 +223,7 @@ const AnalyticsSection = () => {
 
       if (Math.random() < 0.3) {
         setDataSource('error');
-        setErrorMessage("Превышен лимит запросов к API Wildberries. Пожалуйста, повторите попытку через несколько минут или используйте кешированные данные.");
+        setErrorMessage("Превышен лимит запросов к API Wildberries. Пожалуйста, повторите попытку через несколько минут или использу��те кешированные данные.");
         setIsLoading(false);
         toast({
           title: "Ошибка API",
@@ -526,6 +528,14 @@ const AnalyticsSection = () => {
             )}
             <Button 
               variant="outline" 
+              onClick={() => setShowGuide(!showGuide)}
+              className="mr-2"
+            >
+              <HelpCircle className="h-4 w-4 mr-2" />
+              {showGuide ? "Скрыть руководство" : "Показать руководство"}
+            </Button>
+            <Button 
+              variant="outline" 
               onClick={() => setShowAIAnalysis(!showAIAnalysis)}
               disabled={isLoading}
             >
@@ -535,12 +545,16 @@ const AnalyticsSection = () => {
                   Загрузка...
                 </>
               ) : (
-                showAIAnalysis ? "Скрыть AI анализ" : "Показать AI ана��из"
+                showAIAnalysis ? "Скрыть AI анализ" : "Показать AI анализ"
               )}
             </Button>
           </div>
         </div>
       </div>
+
+      {showGuide && (
+        <AnalyticsGuide />
+      )}
 
       {isLoading && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-100 dark:border-blue-800/30 p-6 rounded-lg flex flex-col items-center justify-center space-y-3">
@@ -638,4 +652,3 @@ const AnalyticsSection = () => {
 };
 
 export default AnalyticsSection;
-
