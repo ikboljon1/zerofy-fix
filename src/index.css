@@ -121,3 +121,14 @@
     transform: scale(1.02);
   }
 }
+
+/* Light mode card styles */
+.light .custom-card {
+  @apply border-purple-100 shadow-purple-100/20;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
+}
+
+.light .hover-card:hover {
+  @apply shadow-md border-purple-200;
+  background: linear-gradient(135deg, #ffffff 0%, #ede9fe 100%);
+}
