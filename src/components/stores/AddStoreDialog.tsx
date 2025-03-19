@@ -8,7 +8,7 @@ import { NewStore, marketplaces } from "@/types/store";
 import { PlusCircle, ShoppingBag, AlertTriangle, Package2, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { validateApiKey } from "@/utils/storeUtils";
+import { validateApiKey, canAddNewStore } from "@/utils/storeUtils";
 import { toast } from "sonner";
 
 interface AddStoreDialogProps {
@@ -34,6 +34,8 @@ export function AddStoreDialog({
   const [apiKeyValidationStatus, setApiKeyValidationStatus] = useState<"idle" | "validating" | "valid" | "invalid">("idle");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [canAddStore, setCanAddStore] = useState<boolean>(true);
+  const [addStoreError, setAddStoreError] = useState<string | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -41,6 +43,10 @@ export function AddStoreDialog({
       try {
         const user = JSON.parse(userData);
         setUserId(user.id);
+        
+        const addStoreStatus = canAddNewStore(user.id);
+        setCanAddStore(addStoreStatus.canAdd);
+        setAddStoreError(addStoreStatus.reason || null);
       } catch (error) {
         console.error("Ошибка получения ID пользователя:", error);
       }
@@ -54,15 +60,14 @@ export function AddStoreDialog({
       setApiKey("");
       setApiKeyValidationStatus("idle");
       setValidationError(null);
+      
+      if (userId) {
+        const addStoreStatus = canAddNewStore(userId);
+        setCanAddStore(addStoreStatus.canAdd);
+        setAddStoreError(addStoreStatus.reason || null);
+      }
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (apiKey) {
-      setApiKeyValidationStatus("idle");
-      setValidationError(null);
-    }
-  }, [apiKey]);
+  }, [isOpen, userId]);
 
   const validateKey = async () => {
     if (!apiKey) return false;
@@ -116,7 +121,7 @@ export function AddStoreDialog({
     onOpenChange(open);
   };
 
-  const isAtStoreLimit = storeCount >= storeLimit;
+  const isAtStoreLimit = storeCount >= storeLimit || !canAddStore;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -143,7 +148,7 @@ export function AddStoreDialog({
           <Alert className="bg-yellow-900/20 border-yellow-800/30 text-yellow-300">
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
             <AlertDescription>
-              Вы достигли лимита магазинов ({storeLimit}) для вашего тарифа. Перейдите на более высокий тариф, чтобы добавить больше магазинов.
+              {addStoreError || `Вы достигли лимита магазинов (${storeLimit}) для вашего тарифа. Перейдите на более высокий тариф, чтобы добавить больше магазинов.`}
             </AlertDescription>
           </Alert>
         )}

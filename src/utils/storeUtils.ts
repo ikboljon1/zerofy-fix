@@ -1,5 +1,6 @@
 import { Store, STORES_STORAGE_KEY, STATS_STORAGE_KEY, ORDERS_STORAGE_KEY, SALES_STORAGE_KEY, WildberriesOrder, WildberriesSale } from "@/types/store";
 import { fetchWildberriesStats, fetchWildberriesOrders, fetchWildberriesSales } from "@/services/wildberriesApi";
+import { applyTariffRestrictions } from "@/data/tariffs";
 import axios from "axios";
 
 export const getLastWeekDateRange = () => {
@@ -584,5 +585,83 @@ export const validateApiKey = async (apiKey: string): Promise<{ isValid: boolean
     }
     
     return { isValid: false, errorMessage: "Невозможно соединиться с API Wildberries" };
+  }
+};
+
+/**
+ * Проверяет, может ли пользователь добавить новый магазин, исходя из ограничений тарифа
+ */
+export const canAddNewStore = (userId: string | null): { 
+  canAdd: boolean; 
+  currentCount: number; 
+  limit: number;
+  reason?: string;
+} => {
+  if (!userId) {
+    return { 
+      canAdd: false, 
+      currentCount: 0, 
+      limit: 0,
+      reason: 'Пользователь не авторизован' 
+    };
+  }
+  
+  try {
+    // Получаем данные пользователя
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      return { 
+        canAdd: false, 
+        currentCount: 0, 
+        limit: 0,
+        reason: 'Данные пользователя не найдены' 
+      };
+    }
+    
+    const user = JSON.parse(userData);
+    const tariffId = user.tariffId || '1';
+    
+    // Получаем ограничения по тарифу
+    const restrictions = applyTariffRestrictions(tariffId);
+    
+    // Загружаем магазины пользователя
+    const allStores = loadStores();
+    const userStores = allStores.filter(store => store.userId === userId);
+    
+    const currentCount = userStores.length;
+    const limit = restrictions.storeLimit;
+    
+    if (currentCount >= limit) {
+      return {
+        canAdd: false,
+        currentCount,
+        limit,
+        reason: `Достигнут лимит магазинов (${limit}) для вашего тарифа`
+      };
+    }
+    
+    // Проверяем, активна ли подписка
+    if (!user.isSubscriptionActive && !user.isInTrial) {
+      return {
+        canAdd: false,
+        currentCount,
+        limit,
+        reason: 'Подписка неактивна. Активируйте подписку для добавления магазинов.'
+      };
+    }
+    
+    return {
+      canAdd: true,
+      currentCount,
+      limit
+    };
+  } catch (error) {
+    console.error('Ошибка при проверке возможности добавления магазина:', error);
+    return {
+      canAdd: false,
+      currentCount: 0,
+      limit: 1,
+      reason: 'Произошла ошибка при проверке'
+    };
   }
 };

@@ -44,7 +44,7 @@ export const initialTariffs: Tariff[] = [
     ],
     isPopular: true,
     isActive: true,
-    storeLimit: 3
+    storeLimit: 2  // Обновлено с 3 на 2 для согласования с кодом в Stores.tsx
   },
   {
     id: '3',
@@ -65,3 +65,70 @@ export const initialTariffs: Tariff[] = [
     storeLimit: 10
   }
 ];
+
+// Функция для обработки окончания пробного периода
+export const handleTrialExpiration = (userData: any): any => {
+  // Проверяем, был ли у пользователя пробный период и закончился ли он
+  if (userData.isInTrial && new Date(userData.trialEndDate) < new Date()) {
+    // После окончания пробного периода переводим на базовый тариф
+    const updatedUserData = {
+      ...userData,
+      isInTrial: false,
+      tariffId: "1", // Базовый тариф
+      isSubscriptionActive: false
+    };
+    
+    // Сохраняем обновленные данные пользователя
+    localStorage.setItem('user', JSON.stringify(updatedUserData));
+    return updatedUserData;
+  }
+  
+  return userData;
+};
+
+// Функция для проверки и применения ограничений тарифа
+export const applyTariffRestrictions = (tariffId: string): { 
+  storeLimit: number,
+  canUseAIAnalysis: boolean,
+  canUseAdvancedReports: boolean,
+  canUseAPIIntegrations: boolean
+} => {
+  const restrictions = {
+    storeLimit: 1,
+    canUseAIAnalysis: false,
+    canUseAdvancedReports: false,
+    canUseAPIIntegrations: false
+  };
+  
+  switch (tariffId) {
+    case "1": // Базовый
+      restrictions.storeLimit = 1;
+      restrictions.canUseAIAnalysis = false;
+      restrictions.canUseAdvancedReports = false;
+      restrictions.canUseAPIIntegrations = false;
+      break;
+    case "2": // Профессиональный
+      restrictions.storeLimit = 2;
+      restrictions.canUseAIAnalysis = false;
+      restrictions.canUseAdvancedReports = true;
+      restrictions.canUseAPIIntegrations = true;
+      break;
+    case "3": // Бизнес
+      restrictions.storeLimit = 10;
+      restrictions.canUseAIAnalysis = true;
+      restrictions.canUseAdvancedReports = true;
+      restrictions.canUseAPIIntegrations = true;
+      break;
+    case "4": // Корпоративный (если такой есть)
+      restrictions.storeLimit = 999; // Практически без ограничений
+      restrictions.canUseAIAnalysis = true;
+      restrictions.canUseAdvancedReports = true;
+      restrictions.canUseAPIIntegrations = true;
+      break;
+    default:
+      // По умолчанию базовый тариф
+      restrictions.storeLimit = 1;
+  }
+  
+  return restrictions;
+};

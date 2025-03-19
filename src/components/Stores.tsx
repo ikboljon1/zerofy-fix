@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ShoppingBag, Store, Package2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { StoreCard } from "./stores/StoreCard";
 import { getSubscriptionStatus, SubscriptionData } from "@/services/userService";
 import { Badge } from "@/components/ui/badge";
 import { clearAllStoreCache, clearStoreCache } from "@/utils/warehouseCacheUtils";
-import { Tariff } from "@/data/tariffs";
+import { Tariff, handleTrialExpiration, initialTariffs, applyTariffRestrictions } from "@/data/tariffs";
 
 const TARIFFS_STORAGE_KEY = "app_tariffs";
 
@@ -24,12 +25,33 @@ export default function Stores({ onStoreSelect }: StoresProps) {
   const [canDeleteStores, setCanDeleteStores] = useState(false);
   const [storeLimit, setStoreLimit] = useState<number>(1); // Default to 1
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isTrialExpired, setIsTrialExpired] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     try {
       const userData = localStorage.getItem('user');
-      const userId = userData ? JSON.parse(userData).id : null;
+      let userId = null;
+      let updatedUserData = null;
+      
+      if (userData) {
+        // Проверка на окончание пробного периода и обновление данных пользователя
+        const parsedUserData = JSON.parse(userData);
+        updatedUserData = handleTrialExpiration(parsedUserData);
+        
+        // Если данные изменились (пробный период закончился), показываем уведомление
+        if (updatedUserData !== parsedUserData && updatedUserData.isInTrial === false) {
+          setIsTrialExpired(true);
+          toast({
+            title: "Пробный период закончился",
+            description: "Ваш пробный период закончился. Вы переведены на Базовый тариф.",
+            variant: "destructive",
+          });
+        }
+        
+        userId = updatedUserData.id;
+      }
+      
       setCurrentUserId(userId);
       
       // Load and filter stores by current user
@@ -45,6 +67,15 @@ export default function Stores({ onStoreSelect }: StoresProps) {
       // Make sure at least one store is selected if any stores exist
       if (userStores.length > 0 && !userStores.some(store => store.isSelected)) {
         handleToggleSelection(userStores[0].id);
+      }
+      
+      // Если количество магазинов превышает лимит после окончания пробного периода
+      if (isTrialExpired && userStores.length > storeLimit) {
+        toast({
+          title: "Превышен лимит магазинов",
+          description: `После окончания пробного периода ваш лимит магазинов снизился до ${storeLimit}. Лишние магазины останутся в системе, но вы не сможете добавлять новые.`,
+          variant: "warning",
+        });
       }
     } catch (error) {
       console.error("Ошибка загрузки магазинов:", error);
@@ -69,7 +100,7 @@ export default function Stores({ onStoreSelect }: StoresProps) {
       const savedTariffsJson = localStorage.getItem(TARIFFS_STORAGE_KEY);
       const savedTariffs: Tariff[] = savedTariffsJson 
         ? JSON.parse(savedTariffsJson) 
-        : [];
+        : initialTariffs;
       
       // Находим тариф пользователя
       const userTariff = savedTariffs.find(t => t.id === tariffId);
@@ -79,24 +110,10 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         console.log(`Applying tariff ${userTariff.name} with store limit: ${userTariff.storeLimit}`);
         setStoreLimit(userTariff.storeLimit);
       } else {
-        // Если тариф не найден, используем лимит по умолчанию на основе tariffId
-        console.log(`Tariff not found in saved tariffs, using default for ID: ${tariffId}`);
-        switch (tariffId) {
-          case "1": // Базовый
-            setStoreLimit(1);
-            break;
-          case "2": // Профессиональный
-            setStoreLimit(2); // Обновлено с 3 на 2 
-            break;
-          case "3": // Бизнес
-            setStoreLimit(10);
-            break;
-          case "4": // Корпоративный
-            setStoreLimit(999); // Practically unlimited
-            break;
-          default:
-            setStoreLimit(1); // Default to basic plan
-        }
+        // Если тариф не найден, используем ограничения из функции applyTariffRestrictions
+        console.log(`Tariff not found in saved tariffs, using restrictions for ID: ${tariffId}`);
+        const restrictions = applyTariffRestrictions(tariffId);
+        setStoreLimit(restrictions.storeLimit);
       }
     } catch (error) {
       console.error("Ошибка при получении лимита магазинов:", error);
@@ -403,6 +420,17 @@ export default function Stores({ onStoreSelect }: StoresProps) {
           storeLimit={storeLimit}
         />
       </div>
+
+      {isTrialExpired && (
+        <Card className="border-amber-500 bg-amber-50/10">
+          <CardContent className="pt-6">
+            <p className="text-amber-500">
+              Ваш пробный период закончился. Текущий тариф: Базовый (лимит {storeLimit} {storeLimit === 1 ? 'магазин' : 'магазина'}).
+              Для получения расширенных возможностей перейдите на более высокий тариф.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {stores.length === 0 ? (
         <Card className="border-dashed">
