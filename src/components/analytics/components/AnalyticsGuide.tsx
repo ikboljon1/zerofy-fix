@@ -8,7 +8,6 @@ import {
   LineChart, 
   BarChart, 
   Info, 
-  FileText, 
   Search, 
   TrendingUp, 
   ShoppingBag, 
@@ -194,33 +193,6 @@ const AnalyticsGuide: React.FC = () => {
                         <p className="text-sm text-muted-foreground">Используйте исторические данные для прогнозирования будущих продаж и планирования поставок.</p>
                       </li>
                     </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="export" className="border rounded-lg mb-3 px-3 py-1 border-cyan-100 dark:border-cyan-900/40">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                    <span className="font-medium">Экспорт и использование отчетов</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="pl-6 mt-1 space-y-2">
-                    <p>Для работы с отчетами:</p>
-                    <ol className="list-decimal pl-6 space-y-1 text-muted-foreground">
-                      <li>Используйте кнопку экспорта для сохранения отчетов в CSV или XLSX формате.</li>
-                      <li>Настройте регулярную отправку отчетов на электронную почту.</li>
-                      <li>Создавайте пользовательские отчеты с нужными вам метриками.</li>
-                      <li>Делитесь отчетами с командой для совместного анализа.</li>
-                    </ol>
-                    
-                    <div className="bg-cyan-50 dark:bg-cyan-950/30 p-2 rounded-md mt-2">
-                      <p className="text-sm flex items-start gap-2">
-                        <Info className="h-4 w-4 text-cyan-600 mt-0.5" />
-                        <span>Регулярное изучение отчетов помогает выявлять долгосрочные тренды и своевременно реагировать на изменения рынка.</span>
-                      </p>
-                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
