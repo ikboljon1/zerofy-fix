@@ -5,10 +5,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import axios from "axios";
 import { AlertCircle, Check, Phone, Mail, Shield } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { getVerificationMethod, updateVerificationMethod } from "@/services/userService";
 
 const VerificationSettings = () => {
   const [verificationMethod, setVerificationMethod] = useState<"email" | "phone">("email");
@@ -24,9 +24,9 @@ const VerificationSettings = () => {
   const fetchVerificationSettings = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get("http://localhost:3001/api/settings/verification-method");
-      setVerificationMethod(response.data.method);
-      setIsVerificationEnabled(response.data.enabled !== false); // Default to true if not specified
+      const { method, enabled } = await getVerificationMethod();
+      setVerificationMethod(method);
+      setIsVerificationEnabled(enabled);
     } catch (error) {
       console.error("Ошибка при получении настроек верификации:", error);
       toast({
@@ -42,10 +42,7 @@ const VerificationSettings = () => {
   const saveVerificationSettings = async () => {
     setIsSaving(true);
     try {
-      await axios.put("http://localhost:3001/api/settings/verification-method", {
-        method: verificationMethod,
-        enabled: isVerificationEnabled
-      });
+      await updateVerificationMethod(verificationMethod, isVerificationEnabled);
       
       toast({
         title: "Успех",
