@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { 
   Tag, 
@@ -10,18 +11,10 @@ import {
   BadgePercent,
   Store
 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tariff, initialTariffs } from "@/data/tariffs";
+import { Tariff, loadTariffs, saveTariffs } from "@/data/tariffs";
 
 interface TariffFormData {
   id: string;
@@ -42,8 +35,6 @@ interface TariffFormData {
   storeLimit: number;
 }
 
-const TARIFFS_STORAGE_KEY = "app_tariffs";
-
 const TariffManagement = () => {
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [selectedTariff, setSelectedTariff] = useState<TariffFormData | null>(null);
@@ -51,29 +42,35 @@ const TariffManagement = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newFeature, setNewFeature] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const savedTariffs = localStorage.getItem(TARIFFS_STORAGE_KEY);
-    if (savedTariffs) {
+    const fetchTariffs = async () => {
+      setIsLoading(true);
       try {
-        const parsedTariffs = JSON.parse(savedTariffs);
-        setTariffs(parsedTariffs);
+        const loadedTariffs = await loadTariffs();
+        setTariffs(loadedTariffs);
       } catch (error) {
         console.error("Ошибка при загрузке тарифов:", error);
-        setTariffs(initialTariffs);
-        localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(initialTariffs));
+        toast({
+          title: "Ошибка загрузки",
+          description: "Не удалось загрузить тарифы. Используются стандартные значения.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      setTariffs(initialTariffs);
-      localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(initialTariffs));
-    }
-  }, []);
+    };
+    
+    fetchTariffs();
+  }, [toast]);
 
   const handleEditTariff = (tariff: Tariff) => {
     setSelectedTariff({ 
       ...tariff, 
-      billingPeriod: tariff.period === 'monthly' ? 'месяц' : 'год' 
+      billingPeriod: convertPeriodToRussian(tariff.period)
     });
     setIsEditDialogOpen(true);
   };
@@ -81,83 +78,161 @@ const TariffManagement = () => {
   const handleDeleteTariff = (tariff: Tariff) => {
     setSelectedTariff({ 
       ...tariff, 
-      billingPeriod: tariff.period === 'monthly' ? 'месяц' : 'год' 
+      billingPeriod: convertPeriodToRussian(tariff.period)
     });
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteTariff = () => {
-    if (selectedTariff) {
-      const updatedTariffs = tariffs.filter((tariff) => tariff.id !== selectedTariff.id);
-      setTariffs(updatedTariffs);
-      localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(updatedTariffs));
-      
-      setIsDeleteDialogOpen(false);
-      toast({
-        title: "Тариф удален",
-        description: `Тариф "${selectedTariff.name}" был успешно удален.`,
-      });
+  const convertPeriodToRussian = (period: string): string => {
+    switch (period) {
+      case 'monthly': return 'месяц';
+      case 'yearly': return 'год';
+      case 'weekly': return 'неделя';
+      case 'daily': return 'день';
+      default: return 'месяц';
     }
   };
 
-  const saveTariffChanges = () => {
-    if (selectedTariff) {
-      const updatedTariff: Tariff = {
-        id: selectedTariff.id,
-        name: selectedTariff.name,
-        price: selectedTariff.price,
-        period: selectedTariff.billingPeriod === 'месяц' ? 'monthly' : 'yearly',
-        description: selectedTariff.id === '1' 
-          ? 'Идеально для начинающих продавцов' 
-          : selectedTariff.id === '2' 
-            ? 'Для растущих магазинов' 
-            : 'Комплексное решение для крупных продавцов',
-        features: selectedTariff.features,
-        isPopular: selectedTariff.isPopular,
-        isActive: true,
-        storeLimit: selectedTariff.storeLimit
-      };
-
-      const updatedTariffs = tariffs.map((tariff) => 
-        (tariff.id === selectedTariff.id ? updatedTariff : tariff)
-      );
-      
-      setTariffs(updatedTariffs);
-      
-      localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(updatedTariffs));
-      
-      setIsEditDialogOpen(false);
-      toast({
-        title: "Изменения сохранены",
-        description: "Данные тарифа были успешно обновлены.",
-      });
+  const convertPeriodToEnglish = (period: string): 'monthly' | 'yearly' | 'weekly' | 'daily' => {
+    switch (period) {
+      case 'месяц': return 'monthly';
+      case 'год': return 'yearly';
+      case 'неделя': return 'weekly';
+      case 'день': return 'daily';
+      default: return 'monthly';
     }
   };
 
-  const addNewTariff = () => {
+  const confirmDeleteTariff = async () => {
     if (selectedTariff) {
-      const newTariff: Tariff = {
-        id: Date.now().toString(),
-        name: selectedTariff.name,
-        price: selectedTariff.price,
-        period: selectedTariff.billingPeriod === 'месяц' ? 'monthly' : 'yearly',
-        description: 'Новый тарифный план',
-        features: selectedTariff.features,
-        isPopular: selectedTariff.isPopular,
-        isActive: true,
-        storeLimit: selectedTariff.storeLimit || 1
-      };
-      
-      const updatedTariffs = [...tariffs, newTariff];
-      setTariffs(updatedTariffs);
-      
-      localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(updatedTariffs));
-      
-      setIsAddDialogOpen(false);
-      toast({
-        title: "Тариф добавлен",
-        description: `Тариф "${newTariff.name}" был успешно добавлен.`,
-      });
+      setIsSaving(true);
+      try {
+        const updatedTariffs = tariffs.filter((tariff) => tariff.id !== selectedTariff.id);
+        const success = await saveTariffs(updatedTariffs);
+        
+        if (success) {
+          setTariffs(updatedTariffs);
+          toast({
+            title: "Тариф удален",
+            description: `Тариф "${selectedTariff.name}" был успешно удален.`,
+          });
+        } else {
+          toast({
+            title: "Предупреждение",
+            description: "Тариф удален только локально. Изменения будут синхронизированы при восстановлении соединения.",
+            variant: "warning"
+          });
+        }
+      } catch (error) {
+        console.error("Ошибка при удалении тарифа:", error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось удалить тариф. Повторите попытку позже.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsSaving(false);
+        setIsDeleteDialogOpen(false);
+      }
+    }
+  };
+
+  const saveTariffChanges = async () => {
+    if (selectedTariff) {
+      setIsSaving(true);
+      try {
+        const updatedTariff: Tariff = {
+          id: selectedTariff.id,
+          name: selectedTariff.name,
+          price: selectedTariff.price,
+          period: convertPeriodToEnglish(selectedTariff.billingPeriod),
+          description: selectedTariff.id === '1' 
+            ? 'Идеально для начинающих продавцов' 
+            : selectedTariff.id === '2' 
+              ? 'Для растущих магазинов' 
+              : 'Комплексное решение для крупных продавцов',
+          features: selectedTariff.features,
+          isPopular: selectedTariff.isPopular,
+          isActive: true,
+          storeLimit: selectedTariff.storeLimit
+        };
+
+        const updatedTariffs = tariffs.map((tariff) => 
+          (tariff.id === selectedTariff.id ? updatedTariff : tariff)
+        );
+        
+        const success = await saveTariffs(updatedTariffs);
+        
+        if (success) {
+          setTariffs(updatedTariffs);
+          toast({
+            title: "Изменения сохранены",
+            description: "Данные тарифа были успешно обновлены.",
+          });
+        } else {
+          toast({
+            title: "Предупреждение",
+            description: "Изменения сохранены локально. Они будут синхронизированы при восстановлении соединения.",
+            variant: "warning"
+          });
+        }
+      } catch (error) {
+        console.error("Ошибка при сохранении тарифа:", error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось сохранить изменения. Повторите попытку позже.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsSaving(false);
+        setIsEditDialogOpen(false);
+      }
+    }
+  };
+
+  const addNewTariff = async () => {
+    if (selectedTariff) {
+      setIsSaving(true);
+      try {
+        const newTariff: Tariff = {
+          id: Date.now().toString(),
+          name: selectedTariff.name,
+          price: selectedTariff.price,
+          period: convertPeriodToEnglish(selectedTariff.billingPeriod),
+          description: 'Новый тарифный план',
+          features: selectedTariff.features,
+          isPopular: selectedTariff.isPopular,
+          isActive: true,
+          storeLimit: selectedTariff.storeLimit || 1
+        };
+        
+        const updatedTariffs = [...tariffs, newTariff];
+        const success = await saveTariffs(updatedTariffs);
+        
+        if (success) {
+          setTariffs(updatedTariffs);
+          toast({
+            title: "Тариф добавлен",
+            description: `Тариф "${newTariff.name}" был успешно добавлен.`,
+          });
+        } else {
+          toast({
+            title: "Предупреждение",
+            description: "Тариф добавлен локально. Изменения будут синхронизированы при восстановлении соединения.",
+            variant: "warning"
+          });
+        }
+      } catch (error) {
+        console.error("Ошибка при добавлении тарифа:", error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось добавить тариф. Повторите попытку позже.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsSaving(false);
+        setIsAddDialogOpen(false);
+      }
     }
   };
 
@@ -204,6 +279,14 @@ const TariffManagement = () => {
     return `${limit} ${limit === 1 ? 'магазин' : limit < 5 ? 'магазина' : 'магазинов'}`;
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -213,7 +296,7 @@ const TariffManagement = () => {
               <BadgePercent className="h-5 w-5" />
               Управление тарифами
             </h2>
-            <Button onClick={startAddingTariff}>
+            <Button onClick={startAddingTariff} disabled={isSaving}>
               <Plus className="mr-2 h-4 w-4" />
               Добавить тариф
             </Button>
@@ -234,7 +317,7 @@ const TariffManagement = () => {
                   
                   <div className="mb-4">
                     <span className="text-3xl font-bold">{formatPrice(tariff.price)} ₽</span>
-                    <span className="text-sm text-muted-foreground">/{tariff.period === 'monthly' ? 'месяц' : 'год'}</span>
+                    <span className="text-sm text-muted-foreground">/{convertPeriodToRussian(tariff.period)}</span>
                   </div>
                   
                   <div className="flex items-center gap-2 mb-4 text-blue-600">
@@ -256,6 +339,7 @@ const TariffManagement = () => {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleEditTariff(tariff)}
+                      disabled={isSaving}
                     >
                       <PenSquare className="h-4 w-4 mr-1" />
                       Изменить
@@ -264,6 +348,7 @@ const TariffManagement = () => {
                       variant="destructive" 
                       size="sm" 
                       onClick={() => handleDeleteTariff(tariff)}
+                      disabled={isSaving}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Удалить
