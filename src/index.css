@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -130,6 +131,18 @@
 .light .hover-card:hover {
   @apply shadow-md border-rose-200;
   background: linear-gradient(135deg, #ffffff 0%, #ffe4e6 100%);
+  transform: translateY(-2px);
+}
+
+/* Specific color for pie chart cards in light mode */
+.light .chart-card {
+  background-color: #F6F9FD;
+  border-color: rgba(220, 230, 245, 0.5);
+  box-shadow: 0 2px 10px rgba(160, 190, 230, 0.1);
+}
+
+.light .chart-card:hover {
+  box-shadow: 0 4px 15px rgba(160, 190, 230, 0.15);
   transform: translateY(-2px);
 }
 
