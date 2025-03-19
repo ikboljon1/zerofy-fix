@@ -125,16 +125,16 @@
 /* Light mode card styles - Enhanced */
 .light .custom-card {
   @apply border-rose-100 shadow-rose-100/30;
-  background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
+  background: #ffffff;
 }
 
 .light .hover-card:hover {
   @apply shadow-md border-rose-200;
-  background: linear-gradient(135deg, #ffffff 0%, #ffe4e6 100%);
+  background: #fafafa;
   transform: translateY(-2px);
 }
 
-/* Analytics card styles for light mode */
+/* Analytics card styles for light mode - Professional colors */
 .light .analytics-card {
   background-color: #F6F9FD; 
   border-color: rgba(220, 230, 245, 0.5);
@@ -158,25 +158,25 @@
   transform: translateY(-2px);
 }
 
-/* Additional card variants for light mode */
+/* Professional card variants for light mode */
 .light .card-pink {
   @apply border-pink-100;
-  background: linear-gradient(135deg, #ffffff 0%, #fce7f3 100%);
+  background-color: #FDF2F8;
 }
 
 .light .card-blue {
   @apply border-blue-100;
-  background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+  background-color: #EFF6FF;
 }
 
 .light .card-amber {
   @apply border-amber-100;
-  background: linear-gradient(135deg, #ffffff 0%, #fef3c7 100%);
+  background-color: #FFFBEB;
 }
 
 .light .card-emerald {
   @apply border-emerald-100;
-  background: linear-gradient(135deg, #ffffff 0%, #d1fae5 100%);
+  background-color: #ECFDF5;
 }
 
 /* Add subtle hover effects for all card variants */
