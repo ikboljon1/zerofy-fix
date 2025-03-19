@@ -33,7 +33,7 @@ const BarChartCard: React.FC<BarChartCardProps> = ({
       variants={chartVariants} 
       transition={{ duration: 0.5, delay }}
     >
-      <Card className="overflow-hidden rounded-xl border shadow-md bg-white dark:bg-slate-900">
+      <Card className="overflow-hidden rounded-xl border shadow-md bg-white dark:bg-slate-900 light:bg-[#F6F9FD] light:hover:shadow-md light:transition-all light:duration-300">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-medium flex items-center gap-2.5">
