@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -175,4 +174,9 @@
   @apply shadow-md;
   transform: translateY(-2px);
   transition: all 0.3s ease;
+}
+
+/* Fix for icon colors in light mode */
+.light .text-primary {
+  color: hsl(217.2 91.2% 59.8%); /* Using the original primary color value */
 }
