@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -28,11 +29,11 @@
  
   .light {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 215 25% 27%; /* Softer text color instead of black */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 25% 27%; /* Matching softer text for card content */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 215 25% 27%; /* Matching for popover */
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
@@ -179,4 +180,17 @@
 /* Fix for icon colors in light mode */
 .light .text-primary {
   color: hsl(217.2 91.2% 59.8%); /* Using the original primary color value */
+}
+
+/* Improved text readability in light mode */
+.light {
+  color: hsl(215 25% 27%); /* Softer blue-gray text color */
+}
+
+.light h1, .light h2, .light h3 {
+  color: hsl(215 30% 22%); /* Slightly darker for headings */
+}
+
+.light .text-foreground {
+  color: hsl(215 25% 27%); /* Explicitly set foreground text */
 }
