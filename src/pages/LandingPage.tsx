@@ -8,7 +8,6 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { initialTariffs } from "@/data/tariffs";
 import Footer from "@/components/layout/Footer";
-
 const LandingPage = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -16,33 +15,30 @@ const LandingPage = () => {
   const [activeDemoTab, setActiveDemoTab] = useState("analytics");
   const navigate = useNavigate();
   const location = useLocation();
-
   const handleAuthClick = (mode: 'login' | 'register') => {
     setAuthMode(mode);
     setShowAuthModal(true);
   };
-
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveScreenshot(prev => (prev + 1) % screenshots.length);
     }, 4000);
     return () => clearInterval(interval);
   }, []);
-
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const section = params.get('section');
-    
     if (section === 'pricing') {
       setTimeout(() => {
         const pricingSection = document.querySelector('#pricing-section');
         if (pricingSection) {
-          pricingSection.scrollIntoView({ behavior: 'smooth' });
+          pricingSection.scrollIntoView({
+            behavior: 'smooth'
+          });
         }
       }, 300); // Небольшая задержка для гарантии загрузки DOM
     }
   }, [location]);
-
   const screenshots = [{
     src: "/lovable-uploads/a6565a9f-933e-4b3d-9010-dd9fd4fba5e7.png",
     alt: "Аналитика продаж - панель показателей",
@@ -69,7 +65,6 @@ const LandingPage = () => {
     title: "Умное управление товарами",
     description: "Полная информация о каждом товаре с показателями прибыльности и динамикой продаж"
   }];
-
   const features = [{
     icon: <BarChart2 className="h-6 w-6 text-primary" />,
     title: "Интеллектуальная аналитика",
@@ -95,7 +90,6 @@ const LandingPage = () => {
     title: "Планирование поставок",
     description: "Анализируем историю продаж и сезонные тренды для оптимизации графика поставок."
   }];
-
   const recommendations = [{
     productName: "Кроссовки спортивные NIKE Air Max",
     sku: "WB-12547863",
@@ -151,7 +145,6 @@ const LandingPage = () => {
       value: "2 990 ₽"
     }]
   }];
-
   const storageAnalysis = {
     title: "Анализ платного хранения",
     description: "Алгоритм выявил товары с высокими затратами на хранение относительно продаж:",
@@ -172,7 +165,6 @@ const LandingPage = () => {
       ratio: 0.67
     }]
   };
-
   const pricingInsight = {
     title: "Оптимизация ценообразования",
     description: "ИИ-модель рассчитала идеальную цену для максимизации прибыли:",
@@ -190,9 +182,7 @@ const LandingPage = () => {
       value: "+18%"
     }]
   };
-
   const activeTariffs = initialTariffs.filter(tariff => tariff.isActive);
-
   const pricing = activeTariffs.map(tariff => ({
     name: tariff.name,
     price: `${tariff.price}`,
@@ -201,7 +191,6 @@ const LandingPage = () => {
     popular: tariff.isPopular,
     buttonVariant: tariff.isPopular ? "default" : "outline" as "default" | "outline"
   }));
-
   const testimonials = [{
     quote: "После внедрения Zerofy наши продажи выросли на 35% всего за три месяца. Точная аналитика помогла выявить неочевидные точки роста, а автоматизация освободила команду от рутины. Это был настоящий прорыв!",
     author: "Анна М.",
@@ -215,7 +204,6 @@ const LandingPage = () => {
     author: "Елена В.",
     company: "Детские игрушки 'Радость'"
   }];
-
   const demoTabs = [{
     id: "analytics",
     title: "Аналитика продаж",
@@ -237,7 +225,6 @@ const LandingPage = () => {
     icon: <CircleDollarSign className="h-5 w-5" />,
     description: "Отслеживание всех финансовых показателей вашего бизнеса"
   }];
-
   const demoContent = {
     analytics: <div className="rounded-lg overflow-hidden border bg-card">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
@@ -267,11 +254,8 @@ const LandingPage = () => {
     recommendations: <div className="rounded-lg overflow-hidden border bg-card">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
         <div className="rounded-md overflow-hidden border">
-          <img 
-          src="/lovable-uploads/73027550-3b12-417f-9974-895de2852cfe.png" 
-          alt="AI-рекомендации" 
-          className="w-[300px] h-auto mx-auto" // Changed size here
-        />
+          <img src="/lovable-uploads/73027550-3b12-417f-9974-895de2852cfe.png" alt="AI-рекомендации" className="w-[300px] h-auto mx-auto" // Changed size here
+          />
         </div>
         <div className="flex flex-col justify-center">
           <h3 className="text-lg font-semibold mb-2">Интеллектуальные AI-рекомендации</h3>
@@ -344,9 +328,7 @@ const LandingPage = () => {
       </div>
     </div>
   };
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="py-16 px-6 md:px-12 lg:px-16">
         <div className="max-w-7xl mx-auto">
@@ -390,19 +372,17 @@ const LandingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature, index) => (
-              <Card key={index} className="bg-card hover:shadow-md transition-all">
-                <CardHeader>
+            {features.map((feature, index) => <Card key={index} className="bg-card hover:shadow-md transition-all rounded-lg">
+                <CardHeader className="bg-slate-900">
                   <div className="bg-primary/10 p-3 rounded-lg w-fit mb-3">
                     {feature.icon}
                   </div>
                   <CardTitle className="text-xl">{feature.title}</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-slate-900">
                   <p className="text-muted-foreground">{feature.description}</p>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -419,21 +399,10 @@ const LandingPage = () => {
           
           <div className="border rounded-xl overflow-hidden shadow-sm">
             <div className="bg-muted p-4 flex overflow-x-auto">
-              {demoTabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveDemoTab(tab.id)}
-                  className={cn(
-                    "flex items-center px-4 py-2 rounded-lg whitespace-nowrap mr-2",
-                    activeDemoTab === tab.id
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-background/40"
-                  )}
-                >
+              {demoTabs.map(tab => <button key={tab.id} onClick={() => setActiveDemoTab(tab.id)} className={cn("flex items-center px-4 py-2 rounded-lg whitespace-nowrap mr-2", activeDemoTab === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:bg-background/40")}>
                   <span className="mr-2">{tab.icon}</span>
                   <span>{tab.title}</span>
-                </button>
-              ))}
+                </button>)}
             </div>
             <div className="p-4">
               {demoContent[activeDemoTab as keyof typeof demoContent]}
@@ -452,14 +421,11 @@ const LandingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricing.map((plan, index) => (
-              <Card key={index} className={cn("flex flex-col", plan.popular ? "border-primary shadow-md relative" : "")}>
-                {plan.popular && (
-                  <div className="absolute top-0 right-0 -translate-y-1/2 px-4 py-1 bg-primary text-primary-foreground rounded-full text-sm font-medium">
+            {pricing.map((plan, index) => <Card key={index} className={cn("flex flex-col", plan.popular ? "border-primary shadow-md relative" : "")}>
+                {plan.popular && <div className="absolute top-0 right-0 -translate-y-1/2 px-4 py-1 bg-primary text-primary-foreground rounded-full text-sm font-medium">
                     Популярный выбор
-                  </div>
-                )}
-                <CardHeader>
+                  </div>}
+                <CardHeader className="bg-slate-900">
                   <CardTitle>{plan.name}</CardTitle>
                   <CardDescription>{plan.description}</CardDescription>
                   <div className="mt-4">
@@ -467,23 +433,20 @@ const LandingPage = () => {
                     {plan.price !== "0" && <span className="text-muted-foreground ml-1">/мес</span>}
                   </div>
                 </CardHeader>
-                <CardContent className="flex-grow">
+                <CardContent className="flex-grow bg-slate-900">
                   <ul className="space-y-2">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start">
+                    {plan.features.map((feature, i) => <li key={i} className="flex items-start">
                         <CheckCircle className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
                         <span>{feature}</span>
-                      </li>
-                    ))}
+                      </li>)}
                   </ul>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="bg-slate-900">
                   <Button className="w-full" variant={plan.buttonVariant}>
                     {plan.price === "0" ? "Начать бесплатно" : "Выбрать план"}
                   </Button>
                 </CardFooter>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -498,9 +461,8 @@ const LandingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="bg-card">
-                <CardContent className="pt-6">
+            {testimonials.map((testimonial, index) => <Card key={index} className="bg-slate-900">
+                <CardContent className="pt-6 bg-slate-900">
                   <div className="mb-4 text-muted-foreground">
                     <QuoteIcon className="h-10 w-10 opacity-50" />
                   </div>
@@ -510,8 +472,7 @@ const LandingPage = () => {
                     <p className="text-sm text-muted-foreground">{testimonial.company}</p>
                   </div>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -533,30 +494,14 @@ const LandingPage = () => {
       <Footer />
 
       {showAuthModal && <AuthModal open={showAuthModal} onClose={() => setShowAuthModal(false)} initialMode={authMode} />}
-    </div>
-  );
+    </div>;
 };
-
 const QuoteIcon = ({
   className
 }: {
   className?: string;
-}) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
+}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z" />
     <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
-  </svg>
-);
-
+  </svg>;
 export default LandingPage;
