@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import TariffManagement from "@/components/admin/TariffManagement";
 import SMTPSettings from "@/components/admin/SMTPSettings";
 import SMSIntegrationSettings from "@/components/admin/SMSIntegrationSettings";
 import VerificationSettings from "@/components/admin/VerificationSettings";
+import UserStatistics from "@/components/admin/UserStatistics";
 
 const Admin = () => {
   const [userData, setUserData] = useState(null);
@@ -70,8 +70,9 @@ const Admin = () => {
       <h1 className="text-2xl font-bold mb-6">Административная панель</h1>
       
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Пользователи</TabsTrigger>
+          <TabsTrigger value="statistics">Статистика</TabsTrigger>
           <TabsTrigger value="tariffs">Тарифы</TabsTrigger>
           <TabsTrigger value="settings">Настройки</TabsTrigger>
           <TabsTrigger value="verification">Верификация</TabsTrigger>
@@ -79,6 +80,10 @@ const Admin = () => {
         
         <TabsContent value="users">
           <UserManagement />
+        </TabsContent>
+        
+        <TabsContent value="statistics">
+          <UserStatistics />
         </TabsContent>
         
         <TabsContent value="tariffs">
