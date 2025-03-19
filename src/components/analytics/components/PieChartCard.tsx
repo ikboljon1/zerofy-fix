@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { COLORS } from "../data/demoData";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
@@ -12,14 +13,14 @@ interface PieChartCardProps {
   data: Array<{
     name: string;
     value: number;
-    count?: number;
-    isNegative?: boolean;
+    count?: number; // Поле для количества
+    isNegative?: boolean; // Флаг для отрицательных значений
   }>;
   valueLabel?: string;
-  showCount?: boolean;
-  emptyMessage?: string;
-  noFallbackData?: boolean;
-  isLoading?: boolean;
+  showCount?: boolean; // Флаг для отображения количества
+  emptyMessage?: string; // Сообщение при отсутствии данных
+  noFallbackData?: boolean; // Флаг для отключения демо-данных
+  isLoading?: boolean; // Флаг для индикации загрузки
 }
 
 const PieChartCard = ({
@@ -32,19 +33,26 @@ const PieChartCard = ({
   noFallbackData = false,
   isLoading = false
 }: PieChartCardProps) => {
+  // Отфильтровываем данные с нулевыми значениями
   const filteredData = data && data.filter(item => item.value !== 0);
+
+  // Проверяем, что данные не пустые и содержат значения
   const hasData = filteredData && filteredData.length > 0;
 
+  // Преобразуем данные для корректного отображения в диаграмме
+  // Для диаграммы используем абсолютные значения, чтобы все сегменты были положительными
   const chartData = hasData ? filteredData.map(item => ({
     ...item,
     value: Math.abs(item.value)
   })) : [];
 
+  // Определяем, нужно ли делать список скроллируемым (если больше 5 элементов)
   const needScroll = filteredData && filteredData.length > 5;
   
+  // Определяем, нужно ли показывать информационное сообщение о применении
   const showApplyInformation = title.includes("реклам") || title.includes("штраф") || title.includes("удержани") || title.includes("Удержания");
   
-  return <Card className="p-3 chart-card">
+  return <Card className="p-3 light:bg-[#F6F9FD] light:hover:shadow-md light:transition-all light:duration-300">
       <div className="flex items-center justify-between mb-3 rounded-none">
         <h3 className="text-base font-medium">{title}</h3>
         <div className="bg-primary/10 dark:bg-primary/20 p-1 rounded-md">
