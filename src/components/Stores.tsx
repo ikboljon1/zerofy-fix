@@ -1,16 +1,16 @@
+
 import { useState, useEffect } from "react";
-import { ShoppingBag, Store, Package2, Loader2 } from "lucide-react";
+import { ShoppingBag, Store, Package2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Store as StoreType, NewStore, STATS_STORAGE_KEY } from "@/types/store";
 import { loadStores, saveStores, refreshStoreStats, ensureStoreSelectionPersistence, validateApiKey } from "@/utils/storeUtils";
 import { AddStoreDialog } from "./stores/AddStoreDialog";
 import { StoreCard } from "./stores/StoreCard";
+import { getSubscriptionStatus, SubscriptionData } from "@/services/userService";
 import { Badge } from "@/components/ui/badge";
 import { clearAllStoreCache, clearStoreCache } from "@/utils/warehouseCacheUtils";
-import { Tariff, handleTrialExpiration, initialTariffs, applyTariffRestrictions, getTariffById } from "@/data/tariffs";
-import { supabase } from "@/integrations/supabase/client";
-import { getProfiles, getStores, getStoreStats, getPaymentHistory } from "@/integrations/supabase/client-wrapper";
+import { Tariff, handleTrialExpiration, initialTariffs, applyTariffRestrictions } from "@/data/tariffs";
 
 const TARIFFS_STORAGE_KEY = "app_tariffs";
 
@@ -29,129 +29,117 @@ export default function Stores({ onStoreSelect }: StoresProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        // Получаем данные о текущем пользователе
-        const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const userData = localStorage.getItem('user');
+      let userId = null;
+      let updatedUserData = null;
+      
+      if (userData) {
+        // Проверка на окончание пробного периода и обновление данных пользователя
+        const parsedUserData = JSON.parse(userData);
+        updatedUserData = handleTrialExpiration(parsedUserData);
         
-        if (!user) {
-          console.warn("Пользователь не авторизован");
-          return;
-        }
-        
-        setCurrentUserId(user.id);
-        
-        // Получаем профиль пользователя из БД
-        const { data: profileData, error: profileError } = await getProfiles()
-          .select('tariff_id, is_in_trial, trial_end_date, is_subscription_active')
-          .eq('id', user.id)
-          .single();
-        
-        if (profileError) {
-          console.error("Ошибка при загрузке профиля:", profileError);
-          return;
-        }
-        
-        // Проверка на окончание пробного периода
-        let updatedUserData = null;
-        const isTrialEnded = profileData && profileData.is_in_trial && new Date(profileData.trial_end_date) < new Date();
-        
-        if (isTrialEnded && profileData) {
-          // Обновляем статус пробного периода в базе
-          const { error: updateError } = await getProfiles()
-            .update({
-              is_in_trial: false,
-              tariff_id: '00000000-0000-0000-0000-000000000001', // Базовый тариф
-              is_subscription_active: false
-            })
-            .eq('id', user.id);
-          
-          if (updateError) {
-            console.error("Ошибка при обновлении статуса пробного периода:", updateError);
-          } else {
-            setIsTrialExpired(true);
-            if (profileData) {
-              profileData.tariff_id = '00000000-0000-0000-0000-000000000001';
-              profileData.is_in_trial = false;
-              profileData.is_subscription_active = false;
-            }
-            
-            toast({
-              title: "Пробный период закончился",
-              description: "Ваш пробный период закончился. Вы переведены на Базовый тариф.",
-              variant: "destructive",
-            });
-          }
-        }
-        
-        // Получаем тариф пользователя и его ограничения
-        if (profileData) {
-          const tariff = await getTariffById(profileData.tariff_id);
-          if (tariff) {
-            console.log(`Тариф пользователя: ${tariff.name}, лимит магазинов: ${tariff.storeLimit}`);
-            setStoreLimit(tariff.storeLimit);
-          } else {
-            // Используем ограничения из функции applyTariffRestrictions в случае ошибки
-            const restrictions = await applyTariffRestrictions(profileData.tariff_id);
-            setStoreLimit(restrictions.storeLimit);
-          }
-        }
-        
-        // Загружаем магазины пользователя
-        const savedStores = ensureStoreSelectionPersistence();
-        const userStores = savedStores.filter(store => store.userId === user.id);
-        setStores(userStores);
-        
-        // Проверяем права на удаление магазинов
-        await checkDeletePermissions();
-        
-        // Выбираем первый магазин, если ни один не выбран
-        if (userStores.length > 0 && !userStores.some(store => store.isSelected)) {
-          handleToggleSelection(userStores[0].id);
-        }
-        
-        // Если количество магазинов превышает лимит после окончания пробного периода
-        if (isTrialExpired && userStores.length > storeLimit) {
+        // Если данные изменились (пробный период закончился), показываем уведомление
+        if (updatedUserData !== parsedUserData && updatedUserData.isInTrial === false) {
+          setIsTrialExpired(true);
           toast({
-            title: "Превышен лимит магазинов",
-            description: `После окончания пробного периода ваш лимит магазинов снизился до ${storeLimit}. Лишние магазины останутся в системе, но вы не сможете добавлять новые.`,
-            variant: "warning",
+            title: "Пробный период закончился",
+            description: "Ваш пробный период закончился. Вы переведены на Базовый тариф.",
+            variant: "destructive",
           });
         }
-      } catch (error) {
-        console.error("Ошибка загрузки данных:", error);
+        
+        userId = updatedUserData.id;
+      }
+      
+      setCurrentUserId(userId);
+      
+      // Load and filter stores by current user
+      const savedStores = ensureStoreSelectionPersistence();
+      const userStores = userId 
+        ? savedStores.filter(store => store.userId === userId)
+        : savedStores;
+      
+      setStores(userStores);
+      checkDeletePermissions();
+      getStoreLimitFromTariff();
+      
+      // Make sure at least one store is selected if any stores exist
+      if (userStores.length > 0 && !userStores.some(store => store.isSelected)) {
+        handleToggleSelection(userStores[0].id);
+      }
+      
+      // Если количество магазинов превышает лимит после окончания пробного периода
+      if (isTrialExpired && userStores.length > storeLimit) {
         toast({
-          title: "Ошибка",
-          description: "Не удалось загрузить данные пользователя и магазинов",
-          variant: "destructive",
+          title: "Превышен лимит магазинов",
+          description: `После окончания пробного периода ваш лимит магазинов снизился до ${storeLimit}. Лишние магазины останутся в системе, но вы не сможете добавлять новые.`,
+          variant: "warning",
         });
       }
-    };
-    
-    loadUserData();
+    } catch (error) {
+      console.error("Ошибка загрузки магазинов:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить список магазинов",
+        variant: "destructive",
+      });
+    }
   }, []);
 
-  const checkDeletePermissions = async () => {
+  const getStoreLimitFromTariff = () => {
+    // Get user data from localStorage
+    const userData = localStorage.getItem('user');
+    if (!userData) return;
+    
     try {
-      // Получаем информацию о подписке пользователя
-      if (!currentUserId) return;
+      const user = JSON.parse(userData);
+      const tariffId = user.tariffId;
       
-      const { data: paymentData } = await getPaymentHistory()
-        .select('payment_date')
-        .eq('user_id', currentUserId)
-        .order('payment_date', { ascending: false })
-        .limit(1);
+      // Получаем тарифы из localStorage или используем значения по умолчанию
+      const savedTariffsJson = localStorage.getItem(TARIFFS_STORAGE_KEY);
+      const savedTariffs: Tariff[] = savedTariffsJson 
+        ? JSON.parse(savedTariffsJson) 
+        : initialTariffs;
       
-      if (paymentData && paymentData.length > 0) {
-        const lastPaymentDate = new Date(paymentData[0].payment_date);
+      // Находим тариф пользователя
+      const userTariff = savedTariffs.find(t => t.id === tariffId);
+      
+      if (userTariff) {
+        // Используем storeLimit из найденного тарифа
+        console.log(`Applying tariff ${userTariff.name} with store limit: ${userTariff.storeLimit}`);
+        setStoreLimit(userTariff.storeLimit);
+      } else {
+        // Если тариф не найден, используем ограничения из функции applyTariffRestrictions
+        console.log(`Tariff not found in saved tariffs, using restrictions for ID: ${tariffId}`);
+        const restrictions = applyTariffRestrictions(tariffId);
+        setStoreLimit(restrictions.storeLimit);
+      }
+    } catch (error) {
+      console.error("Ошибка при получении лимита магазинов:", error);
+      setStoreLimit(1); // Default to basic plan on error
+    }
+  };
+
+  const checkDeletePermissions = async () => {
+    // Get current user from localStorage
+    const userData = localStorage.getItem('user');
+    if (!userData) return;
+    
+    try {
+      const user = JSON.parse(userData);
+      
+      // Get subscription information
+      const subscriptionData: SubscriptionData = getSubscriptionStatus(user);
+      
+      if (subscriptionData && subscriptionData.endDate) {
+        const subscriptionEndDate = new Date(subscriptionData.endDate);
         const oneMonthAgo = new Date();
         oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
         
-        // Разрешаем удаление, если с момента последнего платежа прошло больше месяца
-        setCanDeleteStores(lastPaymentDate < oneMonthAgo);
-      } else {
-        // Если нет платежей, разрешаем удаление
-        setCanDeleteStores(true);
+        // Если конец подписки более чем через месяц, значит подписка оформлена менее месяца назад
+        // В этом случае удаление запрещено
+        setCanDeleteStores(subscriptionEndDate.getTime() - oneMonthAgo.getTime() < 0);
       }
     } catch (error) {
       console.error("Ошибка при проверке разрешений:", error);
@@ -196,24 +184,12 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         return;
       }
 
-      // Получаем данные о текущем пользователе
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user ? user.id : null;
-      
-      if (!userId) {
-        toast({
-          title: "Ошибка авторизации",
-          description: "Необходимо авторизоваться для добавления магазина",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
+      // Get current user from localStorage
+      const userData = localStorage.getItem('user');
+      const userId = userData ? JSON.parse(userData).id : null;
 
-      // Создаем новый магазин
-      const storeId = Date.now().toString();
       const store: StoreType = {
-        id: storeId,
+        id: Date.now().toString(),
         marketplace: newStore.marketplace,
         name: newStore.name,
         apiKey: newStore.apiKey,
@@ -224,35 +200,8 @@ export default function Stores({ onStoreSelect }: StoresProps) {
 
       console.log("Created new store object:", store);
 
-      // Обновляем статистику магазина
       const updatedStore = await refreshStoreStats(store);
       const storeToAdd = updatedStore || store;
-      
-      // Сохраняем магазин в базу данных
-      const { error: storeError } = await getStores()
-        .insert({
-          store_id: storeId,
-          user_id: userId,
-          marketplace: newStore.marketplace,
-          name: newStore.name,
-          api_key: newStore.apiKey,
-          is_selected: false,
-          last_fetch_date: new Date().toISOString()
-        });
-        
-      if (storeError) {
-        console.error("Ошибка при сохранении магазина в базу:", storeError);
-        throw new Error(`Не удалось сохранить магазин: ${storeError.message}`);
-      }
-      
-      // Обновляем счетчик магазинов пользователя
-      const { error: profileError } = await getProfiles()
-        .update({ store_count: stores.length + 1 })
-        .eq('id', userId);
-        
-      if (profileError) {
-        console.error("Ошибка при обновлении счетчика магазинов:", profileError);
-      }
       
       // Save data for Analytics and Dashboard
       if (updatedStore && updatedStore.stats) {
@@ -265,19 +214,6 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         };
         
         localStorage.setItem(`marketplace_analytics_${store.id}`, JSON.stringify(analyticsData));
-        
-        // Сохраняем статистику в базу данных
-        const { error: statsError } = await getStoreStats()
-          .insert({
-            store_id: storeId,
-            date_from: analyticsData.dateFrom,
-            date_to: analyticsData.dateTo,
-            data: analyticsData.data
-          });
-          
-        if (statsError) {
-          console.error("Ошибка при сохранении статистики магазина:", statsError);
-        }
       }
       
       // Get all stores and add the new one
