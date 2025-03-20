@@ -665,3 +665,13 @@ export const canAddNewStore = (userId: string | null): {
     };
   }
 };
+
+export const checkStoreLimit = async (tariffId: string) => {
+  try {
+    const restrictions = await applyTariffRestrictions(tariffId);
+    return restrictions.storeLimit;
+  } catch (error) {
+    console.error('Error checking store limit:', error);
+    return 1; // Default to 1 in case of error
+  }
+};

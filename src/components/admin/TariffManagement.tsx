@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Tag, 
@@ -25,7 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tariff, loadTariffs, saveTariffs } from "@/data/tariffs";
-import { supabase } from "@/integrations/supabase/client";
+import { getProfiles, getTariffs, supabase } from "@/integrations/supabase/client-wrapper";
 
 interface TariffFormData {
   id: string;
@@ -110,9 +109,7 @@ const TariffManagement = () => {
     if (selectedTariff) {
       setIsSaving(true);
       try {
-        // Проверяем, есть ли пользователи с этим тарифом
-        const { data: usersWithTariff, error: userCheckError } = await supabase
-          .from('profiles')
+        const { data: usersWithTariff, error: userCheckError } = await getProfiles()
           .select('id')
           .eq('tariff_id', selectedTariff.id);
           
@@ -131,9 +128,7 @@ const TariffManagement = () => {
           return;
         }
           
-        // Удаляем тариф из базы данных
-        const { error: deleteError } = await supabase
-          .from('tariffs')
+        const { error: deleteError } = await getTariffs()
           .delete()
           .eq('id', selectedTariff.id);
           
@@ -191,9 +186,7 @@ const TariffManagement = () => {
           storeLimit: selectedTariff.storeLimit
         };
 
-        // Сохраняем изменения в Supabase
-        const { error } = await supabase
-          .from('tariffs')
+        const { error } = await getTariffs()
           .update({
             name: updatedTariff.name,
             price: updatedTariff.price,
@@ -254,9 +247,7 @@ const TariffManagement = () => {
           storeLimit: selectedTariff.storeLimit || 1
         };
         
-        // Сохраняем новый тариф в Supabase
-        const { error } = await supabase
-          .from('tariffs')
+        const { error } = await getTariffs()
           .insert({
             id: newTariff.id,
             name: newTariff.name,

@@ -1,3 +1,5 @@
+import { getTariffs, getProfiles, supabase } from "@/integrations/supabase/client-wrapper";
+import type { Tariff as SupabaseTariff } from "@/types/supabase-custom";
 
 export interface Tariff {
   id: string;
@@ -69,14 +71,11 @@ export const initialTariffs: Tariff[] = [
 // Константа для локального хранения
 export const TARIFFS_STORAGE_KEY = "app_tariffs";
 
-import { supabase } from "@/integrations/supabase/client";
-
 // Функция для загрузки тарифов из Supabase
 export const loadTariffs = async (): Promise<Tariff[]> => {
   try {
     // Пытаемся загрузить тарифы из Supabase
-    const { data: tariffsData, error } = await supabase
-      .from('tariffs')
+    const { data: tariffsData, error } = await getTariffs()
       .select('*')
       .order('price');
     
@@ -135,20 +134,18 @@ export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
       throw new Error('Пользователь не авторизован');
     }
     
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
+    const { data: profileData, error: profileError } = await getProfiles()
       .select('role')
       .eq('id', userData.user.id)
       .single();
     
-    if (profileError || profileData?.role !== 'admin') {
+    if (profileError || !profileData || profileData.role !== 'admin') {
       throw new Error('Нет прав для изменения тарифов');
     }
     
     // Для каждого тарифа выполняем upsert (обновление или вставку)
     for (const tariff of tariffs) {
-      const { error } = await supabase
-        .from('tariffs')
+      const { error } = await getTariffs()
         .upsert({
           id: tariff.id,
           name: tariff.name,
@@ -185,8 +182,7 @@ export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
 export const getTariffById = async (tariffId: string): Promise<Tariff | undefined> => {
   try {
     // Сначала пытаемся получить из Supabase
-    const { data, error } = await supabase
-      .from('tariffs')
+    const { data, error } = await getTariffs()
       .select('*')
       .eq('id', tariffId)
       .single();
@@ -227,8 +223,7 @@ export const handleTrialExpiration = async (userData: any): Promise<any> => {
   if (userData.isInTrial && new Date(userData.trialEndDate) < new Date()) {
     try {
       // Обновляем профиль пользователя в Supabase
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await getProfiles()
         .update({
           is_in_trial: false,
           tariff_id: '00000000-0000-0000-0000-000000000001', // Базовый тариф
