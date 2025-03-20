@@ -6,11 +6,11 @@ import { Store as StoreType, NewStore, STATS_STORAGE_KEY } from "@/types/store";
 import { loadStores, saveStores, refreshStoreStats, ensureStoreSelectionPersistence, validateApiKey } from "@/utils/storeUtils";
 import { AddStoreDialog } from "./stores/AddStoreDialog";
 import { StoreCard } from "./stores/StoreCard";
-import { getSubscriptionStatus, SubscriptionData } from "@/services/userService";
 import { Badge } from "@/components/ui/badge";
 import { clearAllStoreCache, clearStoreCache } from "@/utils/warehouseCacheUtils";
 import { Tariff, handleTrialExpiration, initialTariffs, applyTariffRestrictions, getTariffById } from "@/data/tariffs";
 import { supabase } from "@/integrations/supabase/client";
+import { getProfiles, getStores, getStoreStats, getPaymentHistory } from "@/integrations/supabase/client-wrapper";
 
 const TARIFFS_STORAGE_KEY = "app_tariffs";
 
@@ -42,8 +42,7 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         setCurrentUserId(user.id);
         
         // Получаем профиль пользователя из БД
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
+        const { data: profileData, error: profileError } = await getProfiles()
           .select('tariff_id, is_in_trial, trial_end_date, is_subscription_active')
           .eq('id', user.id)
           .single();
@@ -55,12 +54,11 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         
         // Проверка на окончание пробного периода
         let updatedUserData = null;
-        const isTrialEnded = profileData.is_in_trial && new Date(profileData.trial_end_date) < new Date();
+        const isTrialEnded = profileData && profileData.is_in_trial && new Date(profileData.trial_end_date) < new Date();
         
-        if (isTrialEnded) {
+        if (isTrialEnded && profileData) {
           // Обновляем статус пробного периода в базе
-          const { error: updateError } = await supabase
-            .from('profiles')
+          const { error: updateError } = await getProfiles()
             .update({
               is_in_trial: false,
               tariff_id: '00000000-0000-0000-0000-000000000001', // Базовый тариф
@@ -72,9 +70,11 @@ export default function Stores({ onStoreSelect }: StoresProps) {
             console.error("Ошибка при обновлении статуса пробного периода:", updateError);
           } else {
             setIsTrialExpired(true);
-            profileData.tariff_id = '00000000-0000-0000-0000-000000000001';
-            profileData.is_in_trial = false;
-            profileData.is_subscription_active = false;
+            if (profileData) {
+              profileData.tariff_id = '00000000-0000-0000-0000-000000000001';
+              profileData.is_in_trial = false;
+              profileData.is_subscription_active = false;
+            }
             
             toast({
               title: "Пробный период закончился",
@@ -85,14 +85,16 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         }
         
         // Получаем тариф пользователя и его ограничения
-        const tariff = await getTariffById(profileData.tariff_id);
-        if (tariff) {
-          console.log(`Тариф пользователя: ${tariff.name}, лимит магазинов: ${tariff.storeLimit}`);
-          setStoreLimit(tariff.storeLimit);
-        } else {
-          // Используем ограничения из функции applyTariffRestrictions в случае ошибки
-          const restrictions = await applyTariffRestrictions(profileData.tariff_id);
-          setStoreLimit(restrictions.storeLimit);
+        if (profileData) {
+          const tariff = await getTariffById(profileData.tariff_id);
+          if (tariff) {
+            console.log(`Тариф пользователя: ${tariff.name}, лимит магазинов: ${tariff.storeLimit}`);
+            setStoreLimit(tariff.storeLimit);
+          } else {
+            // Используем ограничения из функции applyTariffRestrictions в случае ошибки
+            const restrictions = await applyTariffRestrictions(profileData.tariff_id);
+            setStoreLimit(restrictions.storeLimit);
+          }
         }
         
         // Загружаем магазины пользователя
@@ -134,8 +136,7 @@ export default function Stores({ onStoreSelect }: StoresProps) {
       // Получаем информацию о подписке пользователя
       if (!currentUserId) return;
       
-      const { data: paymentData } = await supabase
-        .from('payment_history')
+      const { data: paymentData } = await getPaymentHistory()
         .select('payment_date')
         .eq('user_id', currentUserId)
         .order('payment_date', { ascending: false })
@@ -228,8 +229,7 @@ export default function Stores({ onStoreSelect }: StoresProps) {
       const storeToAdd = updatedStore || store;
       
       // Сохраняем магазин в базу данных
-      const { error: storeError } = await supabase
-        .from('stores')
+      const { error: storeError } = await getStores()
         .insert({
           store_id: storeId,
           user_id: userId,
@@ -246,8 +246,7 @@ export default function Stores({ onStoreSelect }: StoresProps) {
       }
       
       // Обновляем счетчик магазинов пользователя
-      const { error: profileError } = await supabase
-        .from('profiles')
+      const { error: profileError } = await getProfiles()
         .update({ store_count: stores.length + 1 })
         .eq('id', userId);
         
@@ -268,8 +267,7 @@ export default function Stores({ onStoreSelect }: StoresProps) {
         localStorage.setItem(`marketplace_analytics_${store.id}`, JSON.stringify(analyticsData));
         
         // Сохраняем статистику в базу данных
-        const { error: statsError } = await supabase
-          .from('store_stats')
+        const { error: statsError } = await getStoreStats()
           .insert({
             store_id: storeId,
             date_from: analyticsData.dateFrom,

@@ -13,7 +13,6 @@ export interface Tariff {
   storeLimit: number;
 }
 
-// Начальные данные тарифов, которые будут использоваться, если данные из базы недоступны
 export const initialTariffs: Tariff[] = [
   {
     id: '00000000-0000-0000-0000-000000000001',
@@ -68,13 +67,10 @@ export const initialTariffs: Tariff[] = [
   }
 ];
 
-// Константа для локального хранения
 export const TARIFFS_STORAGE_KEY = "app_tariffs";
 
-// Функция для загрузки тарифов из Supabase
 export const loadTariffs = async (): Promise<Tariff[]> => {
   try {
-    // Пытаемся загрузить тарифы из Supabase
     const { data: tariffsData, error } = await getTariffs()
       .select('*')
       .order('price');
@@ -84,7 +80,6 @@ export const loadTariffs = async (): Promise<Tariff[]> => {
     }
     
     if (tariffsData && tariffsData.length > 0) {
-      // Преобразуем данные из базы в формат Tariff
       const tariffs: Tariff[] = tariffsData.map(tariff => ({
         id: tariff.id,
         name: tariff.name,
@@ -97,19 +92,16 @@ export const loadTariffs = async (): Promise<Tariff[]> => {
         storeLimit: tariff.store_limit
       }));
       
-      // Сохраняем в localStorage для оффлайн-доступа
       localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
       
       return tariffs;
     } else {
-      // Если в базе нет тарифов, используем initialTariffs
       localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(initialTariffs));
       return initialTariffs;
     }
   } catch (error) {
     console.warn('Ошибка при загрузке тарифов:', error);
     
-    // Пробуем загрузить из localStorage если Supabase недоступен
     const savedTariffs = localStorage.getItem(TARIFFS_STORAGE_KEY);
     if (savedTariffs) {
       try {
@@ -119,16 +111,13 @@ export const loadTariffs = async (): Promise<Tariff[]> => {
       }
     }
     
-    // Если и localStorage пуст или некорректен, возвращаем начальные данные
     localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(initialTariffs));
     return initialTariffs;
   }
 };
 
-// Функция для сохранения тарифов в Supabase
 export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
   try {
-    // Проверяем, есть ли у пользователя права администратора
     const { data: userData } = await supabase.auth.getUser();
     if (!userData?.user) {
       throw new Error('Пользователь не авторизован');
@@ -143,7 +132,6 @@ export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
       throw new Error('Нет прав для изменения тарифов');
     }
     
-    // Для каждого тарифа выполняем upsert (обновление или вставку)
     for (const tariff of tariffs) {
       const { error } = await getTariffs()
         .upsert({
@@ -166,22 +154,18 @@ export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
       }
     }
     
-    // При успехе обновляем и localStorage
     localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
     return true;
   } catch (error) {
     console.error('Ошибка при сохранении тарифов:', error);
     
-    // Даже если не удалось сохранить в Supabase, обновляем localStorage
     localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
     return false;
   }
 };
 
-// Функция для получения тарифа по ID
 export const getTariffById = async (tariffId: string): Promise<Tariff | undefined> => {
   try {
-    // Сначала пытаемся получить из Supabase
     const { data, error } = await getTariffs()
       .select('*')
       .eq('id', tariffId)
@@ -205,28 +189,23 @@ export const getTariffById = async (tariffId: string): Promise<Tariff | undefine
       };
     }
     
-    // Если в Supabase не найдено, ищем локально
     const tariffs = await loadTariffs();
     return tariffs.find(tariff => tariff.id === tariffId);
   } catch (error) {
     console.error('Ошибка при получении тарифа по ID:', error);
     
-    // Пробуем получить из локального хранилища
     const tariffs = await loadTariffs();
     return tariffs.find(tariff => tariff.id === tariffId);
   }
 };
 
-// Функция для обработки окончания пробного периода
 export const handleTrialExpiration = async (userData: any): Promise<any> => {
-  // Проверяем, был ли у пользователя пробный период и закончился ли он
   if (userData.isInTrial && new Date(userData.trialEndDate) < new Date()) {
     try {
-      // Обновляем профиль пользователя в Supabase
       const { error } = await getProfiles()
         .update({
           is_in_trial: false,
-          tariff_id: '00000000-0000-0000-0000-000000000001', // Базовый тариф
+          tariff_id: '00000000-0000-0000-0000-000000000001',
           is_subscription_active: false
         })
         .eq('id', userData.id);
@@ -235,15 +214,13 @@ export const handleTrialExpiration = async (userData: any): Promise<any> => {
         throw new Error(`Ошибка при обновлении профиля пользователя: ${error.message}`);
       }
       
-      // Обновляем локальные данные
       const updatedUserData = {
         ...userData,
         isInTrial: false,
-        tariffId: "00000000-0000-0000-0000-000000000001", // Базовый тариф
+        tariffId: "00000000-0000-0000-0000-000000000001",
         isSubscriptionActive: false
       };
       
-      // Сохраняем обновленные данные пользователя
       localStorage.setItem('user', JSON.stringify(updatedUserData));
       return updatedUserData;
     } catch (error) {
@@ -254,7 +231,6 @@ export const handleTrialExpiration = async (userData: any): Promise<any> => {
   return userData;
 };
 
-// Функция для проверки и применения ограничений тарифа
 export const applyTariffRestrictions = async (tariffId: string): Promise<{ 
   storeLimit: number,
   canUseAIAnalysis: boolean,
@@ -262,22 +238,20 @@ export const applyTariffRestrictions = async (tariffId: string): Promise<{
   canUseAPIIntegrations: boolean
 }> => {
   try {
-    // Получаем тариф из Supabase
     const tariff = await getTariffById(tariffId);
     
     if (tariff) {
       return {
         storeLimit: tariff.storeLimit,
-        canUseAIAnalysis: tariff.id === '00000000-0000-0000-0000-000000000003', // Только для Бизнес тарифа
-        canUseAdvancedReports: ['00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'].includes(tariff.id), // Для Профессионального и Бизнес
-        canUseAPIIntegrations: ['00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'].includes(tariff.id) // Для Профессионального и Бизнес
+        canUseAIAnalysis: tariff.id === '00000000-0000-0000-0000-000000000003',
+        canUseAdvancedReports: ['00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'].includes(tariff.id),
+        canUseAPIIntegrations: ['00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'].includes(tariff.id)
       };
     }
   } catch (error) {
     console.error('Ошибка при получении ограничений тарифа:', error);
   }
   
-  // Дефолтные ограничения, если тариф не найден
   const restrictions = {
     storeLimit: 1,
     canUseAIAnalysis: false,
@@ -286,22 +260,21 @@ export const applyTariffRestrictions = async (tariffId: string): Promise<{
   };
   
   switch (tariffId) {
-    case "00000000-0000-0000-0000-000000000001": // Базовый
+    case "00000000-0000-0000-0000-000000000001":
       restrictions.storeLimit = 1;
       break;
-    case "00000000-0000-0000-0000-000000000002": // Профессиональный
+    case "00000000-0000-0000-0000-000000000002":
       restrictions.storeLimit = 2;
       restrictions.canUseAdvancedReports = true;
       restrictions.canUseAPIIntegrations = true;
       break;
-    case "00000000-0000-0000-0000-000000000003": // Бизнес
+    case "00000000-0000-0000-0000-000000000003":
       restrictions.storeLimit = 10;
       restrictions.canUseAIAnalysis = true;
       restrictions.canUseAdvancedReports = true;
       restrictions.canUseAPIIntegrations = true;
       break;
     default:
-      // По умолчанию базовый тариф
       restrictions.storeLimit = 1;
   }
   

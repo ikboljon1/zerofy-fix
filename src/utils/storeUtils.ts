@@ -2,6 +2,7 @@ import { Store, STORES_STORAGE_KEY, STATS_STORAGE_KEY, ORDERS_STORAGE_KEY, SALES
 import { fetchWildberriesStats, fetchWildberriesOrders, fetchWildberriesSales } from "@/services/wildberriesApi";
 import { applyTariffRestrictions } from "@/data/tariffs";
 import axios from "axios";
+import { supabase } from "@/services/supabase";
 
 export const getLastWeekDateRange = () => {
   const now = new Date();
@@ -675,3 +676,34 @@ export const checkStoreLimit = async (tariffId: string) => {
     return 1; // Default to 1 in case of error
   }
 };
+
+export const validateStoreLimit = async (userId: string, currentStoreCount: number): Promise<boolean> => {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) {
+      return false;
+    }
+    
+    // Get user's profile data
+    const { data: profileData, error } = await supabase
+      .from('profiles')
+      .select('tariff_id')
+      .eq('id', userData.user.id)
+      .single();
+    
+    if (error || !profileData) {
+      console.error("Failed to get user's tariff information:", error);
+      return false;
+    }
+    
+    // Get tariff restrictions
+    const restrictions = await applyTariffRestrictions(profileData.tariff_id);
+    
+    // Check if store limit is reached
+    return currentStoreCount < restrictions.storeLimit;
+  } catch (error) {
+    console.error("Error validating store limit:", error);
+    return false;
+  }
+};
+
