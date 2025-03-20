@@ -9,7 +9,8 @@ import {
   X, 
   CreditCard,
   BadgePercent,
-  Store
+  Store,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tariff, loadTariffs, saveTariffs } from "@/data/tariffs";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TariffFormData {
   id: string;
@@ -51,6 +53,7 @@ const TariffManagement = () => {
       setIsLoading(true);
       try {
         const loadedTariffs = await loadTariffs();
+        console.log("Загруженные тарифы:", loadedTariffs);
         setTariffs(loadedTariffs);
       } catch (error) {
         console.error("Ошибка при загрузке тарифов:", error);
@@ -107,6 +110,37 @@ const TariffManagement = () => {
     if (selectedTariff) {
       setIsSaving(true);
       try {
+        // Проверяем, есть ли пользователи с этим тарифом
+        const { data: usersWithTariff, error: userCheckError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('tariff_id', selectedTariff.id);
+          
+        if (userCheckError) {
+          throw new Error(`Ошибка при проверке пользователей: ${userCheckError.message}`);
+        }
+        
+        if (usersWithTariff && usersWithTariff.length > 0) {
+          toast({
+            title: "Невозможно удалить тариф",
+            description: `Этот тариф используется ${usersWithTariff.length} пользователями. Сначала переведите их на другой тариф.`,
+            variant: "destructive"
+          });
+          setIsSaving(false);
+          setIsDeleteDialogOpen(false);
+          return;
+        }
+          
+        // Удаляем тариф из базы данных
+        const { error: deleteError } = await supabase
+          .from('tariffs')
+          .delete()
+          .eq('id', selectedTariff.id);
+          
+        if (deleteError) {
+          throw new Error(`Ошибка при удалении тарифа: ${deleteError.message}`);
+        }
+        
         const updatedTariffs = tariffs.filter((tariff) => tariff.id !== selectedTariff.id);
         const success = await saveTariffs(updatedTariffs);
         
@@ -146,9 +180,9 @@ const TariffManagement = () => {
           name: selectedTariff.name,
           price: selectedTariff.price,
           period: convertPeriodToEnglish(selectedTariff.billingPeriod),
-          description: selectedTariff.id === '1' 
+          description: selectedTariff.id === '00000000-0000-0000-0000-000000000001' 
             ? 'Идеально для начинающих продавцов' 
-            : selectedTariff.id === '2' 
+            : selectedTariff.id === '00000000-0000-0000-0000-000000000002' 
               ? 'Для растущих магазинов' 
               : 'Комплексное решение для крупных продавцов',
           features: selectedTariff.features,
@@ -157,25 +191,37 @@ const TariffManagement = () => {
           storeLimit: selectedTariff.storeLimit
         };
 
+        // Сохраняем изменения в Supabase
+        const { error } = await supabase
+          .from('tariffs')
+          .update({
+            name: updatedTariff.name,
+            price: updatedTariff.price,
+            period: updatedTariff.period,
+            description: updatedTariff.description,
+            features: updatedTariff.features,
+            is_popular: updatedTariff.isPopular,
+            is_active: updatedTariff.isActive,
+            store_limit: updatedTariff.storeLimit,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', updatedTariff.id);
+          
+        if (error) {
+          throw new Error(`Ошибка при обновлении тарифа: ${error.message}`);
+        }
+
         const updatedTariffs = tariffs.map((tariff) => 
           (tariff.id === selectedTariff.id ? updatedTariff : tariff)
         );
         
-        const success = await saveTariffs(updatedTariffs);
+        setTariffs(updatedTariffs);
+        localStorage.setItem('app_tariffs', JSON.stringify(updatedTariffs));
         
-        if (success) {
-          setTariffs(updatedTariffs);
-          toast({
-            title: "Изменения сохранены",
-            description: "Данные тарифа были успешно обновлены.",
-          });
-        } else {
-          toast({
-            title: "Предупреждение",
-            description: "Изменения сохранены локально. Они будут синхронизированы при восстановлении соединения.",
-            variant: "warning"
-          });
-        }
+        toast({
+          title: "Изменения сохранены",
+          description: "Данные тарифа были успешно обновлены.",
+        });
       } catch (error) {
         console.error("Ошибка при сохранении тарифа:", error);
         toast({
@@ -194,8 +240,10 @@ const TariffManagement = () => {
     if (selectedTariff) {
       setIsSaving(true);
       try {
+        const newTariffId = crypto.randomUUID();
+        
         const newTariff: Tariff = {
-          id: Date.now().toString(),
+          id: newTariffId,
           name: selectedTariff.name,
           price: selectedTariff.price,
           period: convertPeriodToEnglish(selectedTariff.billingPeriod),
@@ -206,22 +254,35 @@ const TariffManagement = () => {
           storeLimit: selectedTariff.storeLimit || 1
         };
         
-        const updatedTariffs = [...tariffs, newTariff];
-        const success = await saveTariffs(updatedTariffs);
-        
-        if (success) {
-          setTariffs(updatedTariffs);
-          toast({
-            title: "Тариф добавлен",
-            description: `Тариф "${newTariff.name}" был успешно добавлен.`,
+        // Сохраняем новый тариф в Supabase
+        const { error } = await supabase
+          .from('tariffs')
+          .insert({
+            id: newTariff.id,
+            name: newTariff.name,
+            price: newTariff.price,
+            period: newTariff.period,
+            description: newTariff.description,
+            features: newTariff.features,
+            is_popular: newTariff.isPopular,
+            is_active: newTariff.isActive,
+            store_limit: newTariff.storeLimit,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
-        } else {
-          toast({
-            title: "Предупреждение",
-            description: "Тариф добавлен локально. Изменения будут синхронизированы при восстановлении соединения.",
-            variant: "warning"
-          });
+          
+        if (error) {
+          throw new Error(`Ошибка при создании тарифа: ${error.message}`);
         }
+        
+        const updatedTariffs = [...tariffs, newTariff];
+        setTariffs(updatedTariffs);
+        localStorage.setItem('app_tariffs', JSON.stringify(updatedTariffs));
+        
+        toast({
+          title: "Тариф добавлен",
+          description: `Тариф "${newTariff.name}" был успешно добавлен.`,
+        });
       } catch (error) {
         console.error("Ошибка при добавлении тарифа:", error);
         toast({
@@ -282,7 +343,7 @@ const TariffManagement = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
       </div>
     );
   }
