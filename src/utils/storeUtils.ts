@@ -2,6 +2,8 @@ import { Store, STORES_STORAGE_KEY, STATS_STORAGE_KEY, ORDERS_STORAGE_KEY, SALES
 import { fetchWildberriesStats, fetchWildberriesOrders, fetchWildberriesSales } from "@/services/wildberriesApi";
 import { applyTariffRestrictions } from "@/data/tariffs";
 import axios from "axios";
+// We need to add this for TypeScript
+import type { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 export const getLastWeekDateRange = () => {
   const now = new Date();
@@ -663,5 +665,38 @@ export const canAddNewStore = (userId: string | null): {
       limit: 1,
       reason: 'Произошла ошибка при проверке'
     };
+  }
+};
+
+export const checkStoreLimit = async (tariffId: string): Promise<number> => {
+  try {
+    const restrictions = await applyTariffRestrictions(tariffId);
+    return restrictions.storeLimit;
+  } catch (error) {
+    console.error('Error checking store limit:', error);
+    return 1; // Default to 1 in case of error
+  }
+};
+
+// We'll modify this function to not rely on supabase directly
+export const validateStoreLimit = async (userId: string, currentStoreCount: number): Promise<boolean> => {
+  try {
+    // Since we're not importing supabase, we'll use localStorage instead
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      return false;
+    }
+
+    const user = JSON.parse(userData);
+    const tariffId = user.tariffId || '1';
+    
+    // Get tariff restrictions
+    const restrictions = await applyTariffRestrictions(tariffId);
+    
+    // Check if store limit is reached
+    return currentStoreCount < restrictions.storeLimit;
+  } catch (error) {
+    console.error("Error validating store limit:", error);
+    return false;
   }
 };
