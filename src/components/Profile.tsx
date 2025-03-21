@@ -34,7 +34,8 @@ import {
   CalendarIcon,
   ShoppingBag,
   KeyRound,
-  BadgePercent
+  BadgePercent,
+  Calendar
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
@@ -47,13 +48,16 @@ import {
   User as UserType,
   PaymentHistoryItem,
   activateSubscription,
+  SubscriptionData,
   addPaymentRecord,
-  getPaymentHistory
+  getPaymentHistory,
+  initialTariffs
 } from "@/services/userService";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface SavedCard {
   cardNumber: string;
@@ -88,6 +92,10 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState(1);
   const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [selectedTariff, setSelectedTariff] = useState<string>("2");
+  const [subscriptionMonths, setSubscriptionMonths] = useState(1);
+  const [isActivating, setIsActivating] = useState(false);
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -144,6 +152,12 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
       setSavedCard(JSON.parse(storedCard));
     }
   }, [propUser]);
+
+  useEffect(() => {
+    if (user) {
+      setSubscriptionData(getSubscriptionStatus(user));
+    }
+  }, [user]);
 
   const userData = userProfile || {
     name: "Иван Иванов",
@@ -567,6 +581,44 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
         </CardFooter>
       </Card>
     );
+  };
+
+  const handleActivateSubscription = async () => {
+    if (!user) return;
+    
+    setIsActivating(true);
+    try {
+      const result = await activateSubscription(
+        user.id, 
+        selectedTariff, 
+        subscriptionMonths
+      );
+      
+      if (result.success && result.user) {
+        onUserUpdated(result.user);
+        setSubscriptionData(getSubscriptionStatus(result.user));
+        
+        toast({
+          title: "Подписка активирована",
+          description: `Подписка успешно активирована до ${result.user.subscriptionEndDate ? format(new Date(result.user.subscriptionEndDate), 'dd.MM.yyyy') : 'бессрочно'}`,
+        });
+      } else {
+        toast({
+          title: "Ошибка активации",
+          description: result.message || "Не удалось активировать подписку",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error activating subscription:", error);
+      toast({
+        title: "Ошибка",
+        description: "Произошла ошибка при активации подписки",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActivating(false);
+    }
   };
 
   return (

@@ -14,14 +14,17 @@ import MainLayout from "@/components/layout/MainLayout";
 import AnalyticsSection from "@/components/analytics/AnalyticsSection";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { getProductProfitabilityData, getSelectedStore } from "@/utils/storeUtils";
-import { User } from "@/services/userService";
+import { User, hasFeatureAccess, getTrialDaysRemaining } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
+import SubscriptionExpiredAlert from "@/components/subscription/SubscriptionExpiredAlert";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
   const isMobile = useIsMobile();
   const [selectedStore, setSelectedStore] = useState<{id: string; apiKey: string} | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [trialDaysLeft, setTrialDaysLeft] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -41,7 +44,17 @@ const Index = () => {
     }
     
     // User is authenticated, set user data
-    setUser(JSON.parse(storedUser));
+    const parsedUser = JSON.parse(storedUser);
+    setUser(parsedUser);
+    
+    // Check if user has access (trial or active subscription)
+    const access = hasFeatureAccess(parsedUser);
+    setHasAccess(access);
+    
+    // Calculate trial days if in trial
+    if (parsedUser.isInTrial) {
+      setTrialDaysLeft(getTrialDaysRemaining(parsedUser));
+    }
     
     // Initialize selected store
     const store = getSelectedStore();
@@ -72,9 +85,24 @@ const Index = () => {
 
   const handleUserUpdated = (updatedUser: User) => {
     setUser(updatedUser);
+    // Re-check access with updated user data
+    setHasAccess(hasFeatureAccess(updatedUser));
+    
+    if (updatedUser.isInTrial) {
+      setTrialDaysLeft(getTrialDaysRemaining(updatedUser));
+    }
+    
+    // Save updated user to storage
+    const storage = sessionStorage.getItem('user') ? sessionStorage : localStorage;
+    storage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const renderContent = () => {
+    // If user doesn't have access (trial expired and no subscription)
+    if (!hasAccess) {
+      return <SubscriptionExpiredAlert user={user} onUserUpdated={handleUserUpdated} />;
+    }
+    
     const { profitable, unprofitable } = getProductsData();
     
     switch (activeTab) {
@@ -155,7 +183,12 @@ const Index = () => {
   };
 
   return (
-    <MainLayout activeTab={activeTab} onTabChange={handleTabChange}>
+    <MainLayout 
+      activeTab={activeTab} 
+      onTabChange={handleTabChange} 
+      user={user}
+      trialDaysLeft={trialDaysLeft}
+    >
       {renderContent()}
     </MainLayout>
   );

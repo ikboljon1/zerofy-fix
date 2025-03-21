@@ -222,6 +222,10 @@ export const registerUser = async (
       };
     }
 
+    // Set up trial period (3 days from now)
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + 3);
+
     // Update profile information in the profiles table
     const { error: profileError } = await supabase
       .from('profiles')
@@ -231,36 +235,26 @@ export const registerUser = async (
         registered_at: new Date().toISOString(),
         status: 'active',
         role: 'user',
-        subscription_type: '1', // Default tariff
+        subscription_type: '3', // Premium plan for trial
+        subscription_expiry: trialEndDate.toISOString(),
       })
       .eq('id', authData.user.id);
 
     if (profileError) {
       console.error('Error updating profile:', profileError);
-      return {
-        success: true, // Auth was successful even if profile update failed
-        user: {
-          id: authData.user.id,
-          name,
-          email,
-          phone,
-          tariffId: '1',
-          isSubscriptionActive: false,
-          registeredAt: new Date().toISOString(),
-          role: 'user',
-          status: 'active'
-        }
-      };
+      // Even if profile update failed, we still created the auth user
     }
 
-    // Return the user data
+    // Return the user data with trial information
     const user: User = {
       id: authData.user.id,
       name,
       email,
       phone,
-      tariffId: '1',
-      isSubscriptionActive: false,
+      tariffId: '3', // Premium during trial
+      isSubscriptionActive: true,
+      isInTrial: true,
+      trialEndDate: trialEndDate.toISOString(),
       registeredAt: new Date().toISOString(),
       role: 'user',
       status: 'active'
@@ -288,25 +282,78 @@ export const activateSubscription = async (
   months: number = 1
 ): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-
-    const response = await fetch(`http://localhost:3001/api/users/${userId}/subscription`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ tariffId, months }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to activate subscription');
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Get current user data
+    const userString = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (!userString) {
+      return { success: false, message: "Пользователь не найден" };
     }
-
-    return await response.json();
-
+    
+    const currentUser = JSON.parse(userString);
+    
+    // Calculate subscription end date
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + months);
+    
+    // Calculate price based on selected tariff and months
+    const selectedTariff = initialTariffs.find(t => t.id === tariffId);
+    if (!selectedTariff) {
+      return { success: false, message: "Выбранный тариф не найден" };
+    }
+    
+    let price = selectedTariff.price * months;
+    
+    // Apply discount based on subscription length
+    if (months === 3) {
+      price = price * 0.95; // 5% discount
+    } else if (months === 6) {
+      price = price * 0.9; // 10% discount
+    } else if (months === 12) {
+      price = price * 0.85; // 15% discount
+    }
+    
+    // In a real app, here would be payment processing logic
+    console.log(`Processing payment of ${price} for ${months} months of ${selectedTariff.name} plan`);
+    
+    // Update user data
+    const updatedUser: User = {
+      ...currentUser,
+      isInTrial: false,
+      tariffId,
+      isSubscriptionActive: true,
+      subscriptionEndDate: endDate.toISOString()
+    };
+    
+    // In a real application, this would be an API call to update the user data
+    // For now, we'll just update the localStorage
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    // Simulate adding payment history record
+    const paymentRecord = {
+      id: `payment-${Date.now()}`,
+      date: new Date().toISOString(),
+      amount: price,
+      description: `Подписка на тариф ${selectedTariff.name} на ${months} мес.`,
+      status: 'completed',
+      tariff: selectedTariff.name,
+      period: `${months} мес.`
+    };
+    
+    console.log('Payment record created:', paymentRecord);
+    
+    return {
+      success: true,
+      user: updatedUser,
+      message: `Подписка успешно активирована до ${endDate.toLocaleDateString()}`
+    };
   } catch (error) {
     console.error('Error activating subscription:', error);
-    return { success: false, message: "Ошибка активации подписки" }; // Сообщение об ошибке
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Ошибка активации подписки" 
+    };
   }
 };
 
@@ -809,7 +856,7 @@ function simulatePop3Connection(settings: Pop3Settings): { success: boolean; mes
     // Random rare server issues
     const randomErrors = [
       "Сервер отклонил соединение: слишком много подключений",
-      "Сервер временно недоступен. Повторите попытку позже",
+      "С��рвер ��ременно недоступен. Повторите попытку позже",
       "Ошибка протокола POP3: неверный ответ от сервера",
       "POP3 соединение было внезапно закрыто сервером"
     ];
@@ -940,6 +987,11 @@ export const getTrialDaysRemaining = (user: User): number => {
   const trialEnd = new Date(user.trialEndDate);
   const today = new Date();
 
+  // If trial has already ended
+  if (trialEnd < today) {
+    return 0;
+  }
+
   const diffTime = trialEnd.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -1033,7 +1085,7 @@ export const getUserSubscriptionData = async (userId: string): Promise<Subscript
 
   } catch (error) {
     console.error('Error fetching user subscription data:', error);
-    return { status: 'expired' }; // Или пробросить ошибку, в зависимости от логики обработки
+    return { status: 'expired' }; // Или пробросить ошибку, �� зависимости от логики обработки
   }
 };
 
@@ -1166,5 +1218,27 @@ export const deleteUserStore = async (userId: string, storeId: string): Promise<
     console.error('Error deleting user store:', error);
     throw error; // Пробрасываем ошибку
   }
+};
+
+export const hasFeatureAccess = (user: User | null): boolean => {
+  if (!user) return false;
+  
+  // User has access if they're in trial period
+  if (user.isInTrial && user.trialEndDate) {
+    const trialDaysLeft = getTrialDaysRemaining(user);
+    if (trialDaysLeft > 0) return true;
+  }
+  
+  // Or if they have an active subscription
+  if (user.isSubscriptionActive) {
+    // Check if subscription has an end date and hasn't expired
+    if (user.subscriptionEndDate) {
+      const endDate = new Date(user.subscriptionEndDate);
+      return endDate > new Date();
+    }
+    return true; // If no end date is specified but subscription is active
+  }
+  
+  return false;
 };
 

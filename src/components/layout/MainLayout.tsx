@@ -14,7 +14,8 @@ import {
   Settings,
   LogOut,
   WarehouseIcon,
-  MenuIcon
+  MenuIcon,
+  Clock
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
 import MobileNavigation from "./MobileNavigation";
 import CalculatorModal from "@/components/CalculatorModal";
+import { User as UserType } from "@/services/userService";
 
 // Define menu profile options - adding logout option
 const profileMenu = [
@@ -49,9 +52,11 @@ interface MainLayoutProps {
   children: React.ReactNode;
   activeTab: string;
   onTabChange: (tab: string) => void;
+  user: UserType | null;
+  trialDaysLeft?: number;
 }
 
-const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
+const MainLayout = ({ children, activeTab, onTabChange, user, trialDaysLeft = 0 }: MainLayoutProps) => {
   const [showCalculator, setShowCalculator] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const isMobile = useIsMobile();
@@ -76,6 +81,41 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
     setShowMobileMenu(false);
   };
 
+  // Get tariff name from tariffId
+  const getTariffName = (tariffId?: string): string => {
+    if (!tariffId) return "";
+    
+    switch (tariffId) {
+      case "1": return "Базовый";
+      case "2": return "Профессиональный";
+      case "3": return "Бизнес";
+      default: return `Тариф ${tariffId}`;
+    }
+  };
+
+  const renderSubscriptionBadge = () => {
+    if (!user) return null;
+    
+    if (user.isInTrial && trialDaysLeft > 0) {
+      return (
+        <Badge variant="outline" className="ml-2 bg-amber-100 text-amber-800 border-amber-200">
+          <Clock className="mr-1 h-3 w-3" />
+          Пробный период: {trialDaysLeft} {trialDaysLeft === 1 ? 'день' : (trialDaysLeft < 5 ? 'дня' : 'дней')}
+        </Badge>
+      );
+    }
+    
+    if (user.isSubscriptionActive) {
+      return (
+        <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-200">
+          {getTariffName(user.tariffId)}
+        </Badge>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b">
@@ -84,6 +124,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
             <div className="flex items-center space-x-2">
               <Zap className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-bold">Zerofy</h1>
+              {renderSubscriptionBadge()}
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="icon" onClick={() => setShowCalculator(true)}>
@@ -103,6 +144,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
                     <SheetTitle className="flex items-center">
                       <Zap className="h-6 w-6 text-primary mr-2" />
                       Zerofy
+                      {renderSubscriptionBadge()}
                     </SheetTitle>
                   </SheetHeader>
                   <div className="flex flex-col space-y-2">
@@ -187,6 +229,7 @@ const MainLayout = ({ children, activeTab, onTabChange }: MainLayoutProps) => {
               <div className="flex items-center space-x-2">
                 <Zap className="h-8 w-8 text-primary" />
                 <h1 className="text-2xl font-bold">Zerofy</h1>
+                {renderSubscriptionBadge()}
               </div>
               <nav className="hidden md:flex space-x-6">
                 <Button 
