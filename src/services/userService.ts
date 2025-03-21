@@ -714,7 +714,7 @@ function simulatePop3Connection(settings: Pop3Settings): { success: boolean; mes
     if (!settings.secure) {
       return {
         success: false,
-        message: "Для Gmail POP3 требуется включить SSL/TLS шифрование"
+        message: "Дл�� Gmail POP3 требуется включить SSL/TLS шифрование"
       };
     }
   }
@@ -1035,7 +1035,7 @@ export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryI
   try {
     await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
 
-    const response = await fetch(`http://localhost:3001/api/users/${userId}/payment-history`); // Предполагаемый эндпоинт для истории платежей
+    const response = await fetch(`http://localhost:3001/api/users/${userId}/payment-history`); // Предполагаемый ��ндпоинт для истории платежей
     if (!response.ok) {
       throw new Error('Failed to fetch payment history');
     }
@@ -1242,5 +1242,3 @@ export const hasFeatureAccess = (user: User | null): boolean => {
   
   return false;
 };
-
-

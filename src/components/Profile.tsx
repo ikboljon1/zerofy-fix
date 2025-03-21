@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -52,8 +53,8 @@ import {
   SubscriptionData,
   addPaymentRecord,
   getPaymentHistory,
-  initialTariffs
 } from "@/services/userService";
+import { initialTariffs } from "@/data/tariffs";  // Import directly from the correct source
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
