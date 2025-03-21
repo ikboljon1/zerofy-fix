@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export interface User {
   id: string;
   name: string;
@@ -416,7 +418,7 @@ export const testSmtpConnection = async (settings: SmtpSettings): Promise<{ succ
     console.error("Ошибка при проверке SMTP:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Неизвестная ошибка при подключении к SMTP-серверу"
+      message: error instanceof Error ? error.message : "Неизвестная ��шибка при подключении к SMTP-серверу"
     };
   }
 };
@@ -921,7 +923,7 @@ export const resetPassword = async (
 
     return {
       success: true,
-      message: "Пароль успешно сброшен. Теперь вы можете войти в систему, используя новый пароль."
+      message: "Пароль успешно ��брошен. Теперь вы можете войти в систему, используя новый пароль."
     };
 
   } catch (error) {
@@ -1165,3 +1167,4 @@ export const deleteUserStore = async (userId: string, storeId: string): Promise<
     throw error; // Пробрасываем ошибку
   }
 };
+
