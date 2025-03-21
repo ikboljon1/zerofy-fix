@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { initialTariffs } from "@/data/tariffs";
 
 export interface User {
   id: string;
@@ -1241,4 +1242,5 @@ export const hasFeatureAccess = (user: User | null): boolean => {
   
   return false;
 };
+
 

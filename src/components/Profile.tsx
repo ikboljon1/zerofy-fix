@@ -9,7 +9,7 @@ import PasswordChangeForm from "@/components/PasswordChangeForm";
 import {
   CreditCard,
   History,
-  User,
+  User as UserIcon,
   DollarSign,
   Mail,
   Phone,
@@ -41,6 +41,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import { 
   TARIFF_STORE_LIMITS, 
   getTrialDaysRemaining, 
@@ -154,10 +155,10 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
   }, [propUser]);
 
   useEffect(() => {
-    if (user) {
-      setSubscriptionData(getSubscriptionStatus(user));
+    if (userProfile) {
+      setSubscriptionData(getSubscriptionStatus(userProfile));
     }
-  }, [user]);
+  }, [userProfile]);
 
   const userData = userProfile || {
     name: "Иван Иванов",
@@ -584,18 +585,18 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
   };
 
   const handleActivateSubscription = async () => {
-    if (!user) return;
+    if (!userProfile) return;
     
     setIsActivating(true);
     try {
       const result = await activateSubscription(
-        user.id, 
+        userProfile.id, 
         selectedTariff, 
         subscriptionMonths
       );
       
       if (result.success && result.user) {
-        onUserUpdated(result.user);
+        onUserUpdated?.(result.user);
         setSubscriptionData(getSubscriptionStatus(result.user));
         
         toast({
@@ -827,7 +828,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4 w-full">
           <TabsTrigger value="profile" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
+            <UserIcon className="h-4 w-4" />
             <span className={isMobile ? 'text-sm' : ''}>Профиль</span>
           </TabsTrigger>
           <TabsTrigger value="password" className="flex items-center gap-2">
@@ -866,7 +867,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
                       defaultValue={userProfile?.name}
                       className="pl-10"
                     />
-                    <User className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+                    <UserIcon className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
                   </div>
                 </div>
                 <div className="space-y-2">

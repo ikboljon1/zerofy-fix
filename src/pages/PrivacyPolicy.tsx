@@ -13,7 +13,7 @@ const PrivacyPolicy = () => {
   };
 
   return (
-    <MainLayout activeTab={activeTab} onTabChange={handleTabChange}>
+    <MainLayout activeTab={activeTab} onTabChange={handleTabChange} user={null} trialDaysLeft={0}>
       <div className="container mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">Политика конфиденциальности</h1>
         
