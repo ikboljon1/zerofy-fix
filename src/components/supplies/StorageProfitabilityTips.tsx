@@ -147,6 +147,10 @@ const StorageProfitabilityTips = () => {
               <span className="flex-shrink-0 text-green-600 dark:text-green-400">•</span>
               <span><b>Динамическое ценообразование:</b> Внедрите систему автоматического снижения цены в зависимости от срока хранения товара на складе.</span>
             </li>
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0 text-purple-600 dark:text-purple-400">•</span>
+              <span><b>Рекламные кампании:</b> Для высокомаржинальных товаров с медленным оборотом инвестируйте в рекламу. Даже если ROI рекламы не очень высок, вы сэкономите на хранении.</span>
+            </li>
           </ul>
         </div>
 
@@ -203,9 +207,37 @@ const StorageProfitabilityTips = () => {
             </li>
           </ul>
         </div>
+        
+        <Separator className="my-4" />
+        
+        <div>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
+            <Megaphone className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            Стратегия рекламного продвижения:
+          </h3>
+          <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0 text-purple-600 dark:text-purple-400">•</span>
+              <span><b>Высокомаржинальные товары с медленными продажами:</b> Идеально подходят для рекламного продвижения. Даже если конверсия невысока, ускорение продаж снизит затраты на хранение.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0 text-purple-600 dark:text-purple-400">•</span>
+              <span><b>Таргетированный подход:</b> Фокусируйте рекламу на подсегментах целевой аудитории, которые с большей вероятностью приобретут товар без значительных скидок.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0 text-purple-600 dark:text-purple-400">•</span>
+              <span><b>Комбинирование методов:</b> Для максимального эффекта сочетайте рекламное продвижение с умеренным снижением цены (5-10%).</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0 text-purple-600 dark:text-purple-400">•</span>
+              <span><b>Мониторинг ROI:</b> Регулярно анализируйте не только прямую окупаемость рекламных инвестиций, но и сокращение затрат на хранение благодаря ускорению продаж.</span>
+            </li>
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );
 };
 
 export default StorageProfitabilityTips;
+
