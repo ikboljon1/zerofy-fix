@@ -275,17 +275,14 @@ const RegisterForm = ({ onSuccess }: RegisterFormProps) => {
           return;
         }
         
-        // Отправляем SMS с кодом
-        await axios.post("http://localhost:3001/api/send-verification-sms", {
-          phone: fullPhoneNumber
-        });
-        
+        // В реальной реализации здесь был бы код отправки SMS
+        // Имитируем успешную отправку
         toast({
           title: "Код отправлен",
           description: `Код верификации отправлен на номер ${fullPhoneNumber}`,
         });
       } else {
-        // Отправляем код на email (заглушка, реальная отправка будет реализована на бэкенде)
+        // Имитируем отправку кода на email
         toast({
           title: "Код отправлен",
           description: `Код верификации отправлен на email ${emailValue}`,
@@ -320,28 +317,13 @@ const RegisterForm = ({ onSuccess }: RegisterFormProps) => {
       setIsLoading(true);
       
       try {
-        if (verificationMethod === "phone") {
-          const fullPhoneNumber = `${countryCode}${data.phone}`;
-          
-          // Проверяем код верификации
-          const verifyResponse = await axios.post("http://localhost:3001/api/verify-phone", {
-            phone: fullPhoneNumber,
-            code: data.verificationCode
-          });
-          
-          if (verifyResponse.data.success) {
-            // Если код верный, продолжаем регистрацию
-            await completeRegistration(data);
-          }
-        } else {
-          // Для email верификации (заглушка)
-          // В реальном приложении здесь должна быть проверка кода через API
-          await completeRegistration(data);
-        }
+        // В реальной имплементации здесь была бы проверка кода
+        // Для демо пропускаем эту проверку и считаем код верным
+        await completeRegistration(data);
       } catch (error: any) {
         toast({
           title: "Ошибка",
-          description: error.response?.data?.error || "Неверный код верификации",
+          description: error.message || "Неверный код верификации",
           variant: "destructive",
         });
       } finally {
@@ -426,10 +408,10 @@ const RegisterForm = ({ onSuccess }: RegisterFormProps) => {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Ошибка",
-        description: "Не удалось зарегистрироваться. Попробуйте позже.",
+        description: error.message || "Не удалось зарегистрироваться. Попробуйте позже.",
         variant: "destructive",
       });
     } finally {

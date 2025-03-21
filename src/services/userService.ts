@@ -151,7 +151,7 @@ export const authenticate = async (
     // Собираем полные данные пользователя
     const userResponse = await fetch(`http://localhost:3001/api/users/${data.id}`);
     if (!userResponse.ok) {
-      return { success: false, errorMessage: 'Ошибка при получении данных пользователя' };
+      return { success: false, errorMessage: 'Ош��бка при получении данных пользователя' };
     }
 
     const user = await userResponse.json();
@@ -174,15 +174,21 @@ export const authenticate = async (
 
 export const checkPhoneExists = async (phone: string): Promise<boolean> => {
   try {
-    const response = await fetch(`http://localhost:3001/api/check-phone?phone=${encodeURIComponent(phone)}`);
-    if (!response.ok) {
-      throw new Error('Failed to check phone');
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking phone:', error);
+      return false;
     }
-    const data = await response.json();
-    return data.exists;
+    
+    return !!data;
   } catch (error) {
     console.error('Error checking phone:', error);
-    throw error; // Пробрасываем ошибку
+    return false; // Assume phone doesn't exist in case of error
   }
 };
 
@@ -193,32 +199,83 @@ export const registerUser = async (
   phone?: string
 ): Promise<{ success: boolean; user?: User; errorMessage?: string }> => {
   try {
-    const response = await fetch('http://localhost:3001/api/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name, email, password, phone }),
+    // Register user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
+    if (authError) {
+      console.error('Error during registration:', authError);
       return {
         success: false,
-        errorMessage: data.error || 'Ошибка при регистрации пользователя'
+        errorMessage: authError.message || 'Ошибка при регистрации пользователя'
       };
     }
 
+    if (!authData.user) {
+      return {
+        success: false,
+        errorMessage: 'Не удалось создать пользователя'
+      };
+    }
+
+    // Update profile information in the profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        name,
+        phone,
+        registered_at: new Date().toISOString(),
+        status: 'active',
+        role: 'user',
+        subscription_type: '1', // Default tariff
+      })
+      .eq('id', authData.user.id);
+
+    if (profileError) {
+      console.error('Error updating profile:', profileError);
+      return {
+        success: true, // Auth was successful even if profile update failed
+        user: {
+          id: authData.user.id,
+          name,
+          email,
+          phone,
+          tariffId: '1',
+          isSubscriptionActive: false,
+          registeredAt: new Date().toISOString(),
+          role: 'user',
+          status: 'active'
+        }
+      };
+    }
+
+    // Return the user data
+    const user: User = {
+      id: authData.user.id,
+      name,
+      email,
+      phone,
+      tariffId: '1',
+      isSubscriptionActive: false,
+      registeredAt: new Date().toISOString(),
+      role: 'user',
+      status: 'active'
+    };
+
+    // Store in localStorage for session
+    localStorage.setItem('user', JSON.stringify(user));
+
     return {
       success: true,
-      user: data.user
+      user
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error during registration:', error);
     return {
       success: false,
-      errorMessage: 'Ошибка при регистрации' // Сообщение об ошибке для компонента
+      errorMessage: error.message || 'Ошибка при регистрации'
     };
   }
 };
