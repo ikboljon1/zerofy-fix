@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -774,3 +775,50 @@ const StorageProfitabilityAnalysis: React.FC<StorageProfitabilityAnalysisProps> 
         description: "Маржинальность товара ниже 15%",
         value: `${result.profitMarginPercentage.toFixed(1)}%`,
         status: "warning",
+        icon: <TrendingDown className="h-3.5 w-3.5 text-amber-500" />
+      });
+    }
+    
+    if (result.storageCostToRevenueRatio > 0.1) {
+      factors.push({
+        label: "Высокие затраты на хранение",
+        description: "Затраты на хранение более 10% от выручки",
+        value: `${(result.storageCostToRevenueRatio * 100).toFixed(1)}%`,
+        status: "error",
+        icon: <Banknote className="h-3.5 w-3.5 text-rose-500" />
+      });
+    }
+    
+    if (result.daysOfInventory > 60) {
+      factors.push({
+        label: "Медленная оборачиваемость",
+        description: "Товар продается медленнее, чем за 60 дней",
+        value: formatDaysOfInventory(result.daysOfInventory),
+        status: "warning",
+        icon: <Clock className="h-3.5 w-3.5 text-amber-500" />
+      });
+    }
+    
+    return factors;
+  };
+
+  // Continue the component implementation
+  return (
+    <Card className="shadow-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-xl flex items-center">
+          <BarChart4 className="mr-2 h-5 w-5 text-primary" />
+          Анализ рентабельности хранения
+        </CardTitle>
+        <CardDescription>
+          Анализ товаров на складах и рекомендации по управлению запасами
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-0">
+        {/* Rest of component implementation */}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default StorageProfitabilityAnalysis;
