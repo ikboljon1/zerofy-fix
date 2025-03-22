@@ -11,7 +11,7 @@ export interface Tariff {
   storeLimit: number;
 }
 
-// Initial tariff data that will be used both in admin panel and landing page
+// Исходные данные о тарифах
 export const initialTariffs: Tariff[] = [
   {
     id: '1',
@@ -69,24 +69,42 @@ export const initialTariffs: Tariff[] = [
 // Константы для локального хранения
 export const TARIFFS_STORAGE_KEY = "app_tariffs";
 
-// Функция для загрузки тарифов (из базы данных или локального хранилища)
+// Функция для загрузки тарифов (из Supabase или локального хранилища)
 export const loadTariffs = async (): Promise<Tariff[]> => {
   try {
-    // Сначала пытаемся получить данные из API (базы данных)
-    const response = await fetch('/api/tariffs');
+    // Импортируем клиент Supabase
+    const { supabase } = await import('@/integrations/supabase/client');
     
-    if (response.ok) {
-      const data = await response.json();
-      // Сохраняем полученные данные в localStorage для оффлайн-доступа
-      localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(data));
-      return data;
-    } else {
-      throw new Error('Не удалось загрузить тарифы из API');
+    // Пытаемся получить тарифы из Supabase
+    const { data, error } = await supabase
+      .from('tariffs')
+      .select('*');
+      
+    if (error) {
+      console.warn('Ошибка при загрузке тарифов из Supabase:', error);
+      throw error;
     }
-  } catch (error) {
-    console.warn('Ошибка при загрузке тарифов из API:', error);
     
-    // Пробуем загрузить из localStorage если API недоступен
+    if (data && data.length > 0) {
+      return data as Tariff[];
+    }
+    
+    // Если в Supabase нет тарифов, пробуем взять их из localStorage
+    const savedTariffs = localStorage.getItem(TARIFFS_STORAGE_KEY);
+    if (savedTariffs) {
+      try {
+        return JSON.parse(savedTariffs);
+      } catch (e) {
+        console.error('Ошибка при парсинге тарифов из localStorage:', e);
+      }
+    }
+    
+    // Если и в Supabase и localStorage нет данных, возвращаем исходные тарифы
+    return initialTariffs;
+  } catch (error) {
+    console.warn('Ошибка при загрузке тарифов:', error);
+    
+    // Пробуем загрузить из localStorage если Supabase недоступен
     const savedTariffs = localStorage.getItem(TARIFFS_STORAGE_KEY);
     if (savedTariffs) {
       try {
@@ -97,34 +115,35 @@ export const loadTariffs = async (): Promise<Tariff[]> => {
     }
     
     // Если и localStorage пуст или некорректен, возвращаем начальные данные
-    localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(initialTariffs));
     return initialTariffs;
   }
 };
 
-// Функция для обновления тарифов (в базе данных и локальном хранилище)
+// Функция для сохранения тарифов (в Supabase и локальном хранилище)
 export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
   try {
-    // Сначала пытаемся сохранить в API (базу данных)
-    const response = await fetch('/api/tariffs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(tariffs),
-    });
+    // Импортируем клиент Supabase
+    const { supabase } = await import('@/integrations/supabase/client');
     
-    if (response.ok) {
-      // При успехе обновляем и localStorage
-      localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
-      return true;
-    } else {
-      throw new Error('Не удалось сохранить тарифы в API');
+    // Сохраняем в localStorage в любом случае
+    localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
+    
+    // Удаляем существующие тарифы в Supabase
+    await supabase.from('tariffs').delete().gte('id', '0');
+    
+    // Добавляем новые тарифы
+    const { error } = await supabase.from('tariffs').insert(tariffs);
+    
+    if (error) {
+      console.error('Ошибка при сохранении тарифов в Supabase:', error);
+      return false;
     }
-  } catch (error) {
-    console.error('Ошибка при сохранении тарифов в API:', error);
     
-    // Даже если не удалось сохранить в API, обновляем localStorage
+    return true;
+  } catch (error) {
+    console.error('Ошибка при сохранении тарифов:', error);
+    
+    // Сохраняем в localStorage даже при ошибке с Supabase
     localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
     return false;
   }

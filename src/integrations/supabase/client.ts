@@ -6,7 +6,53 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://mahwbmitxkrxpfobnfai.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1haHdibWl0eGtyeHBmb2JuZmFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0NDAzMDEsImV4cCI6MjA1ODAxNjMwMX0.U0TVqTbk3gd-5K7SfKsb_ALYpcI6N7usO4jWTxymi8k";
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Вспомогательные функции для работы с тарифами
+export const saveTariffData = async (tariffId: string, userId: string, months: number, amount: number) => {
+  const payment = {
+    amount,
+    method: "card",
+  };
+
+  try {
+    const { data, error } = await supabase.functions.invoke('payments', {
+      body: {
+        method: "add",
+        payment,
+        userId,
+        tariffId,
+        months
+      }
+    });
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error saving tariff payment:", error);
+    throw error;
+  }
+};
+
+export const getPaymentHistory = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('payments', {
+      body: {
+        method: "get",
+        userId
+      }
+    });
+    
+    if (error) throw error;
+    return data.payments;
+  } catch (error) {
+    console.error("Error getting payment history:", error);
+    throw error;
+  }
+};

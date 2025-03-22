@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, activateSubscription } from "@/services/userService";
+import { User } from "@/services/userService";
 import { initialTariffs } from "@/data/tariffs";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { saveTariffData, supabase } from '@/integrations/supabase/client';
 
 interface SubscriptionExpiredAlertProps {
   user: User | null;
@@ -24,10 +25,62 @@ const SubscriptionExpiredAlert: React.FC<SubscriptionExpiredAlertProps> = ({ use
   const handleActivateSubscription = async () => {
     setIsActivating(true);
     try {
-      const result = await activateSubscription(user.id, selectedTariff, subscriptionMonths);
+      // Находим выбранный тариф
+      const tariff = initialTariffs.find(t => t.id === selectedTariff);
+      if (!tariff) {
+        throw new Error("Тариф не найден");
+      }
       
-      if (result.success && result.user) {
-        onUserUpdated(result.user);
+      // Рассчитываем стоимость с учетом скидки
+      let priceWithDiscount = tariff.price * subscriptionMonths;
+      
+      if (subscriptionMonths === 3) {
+        priceWithDiscount *= 0.95; // 5% скидка
+      } else if (subscriptionMonths === 6) {
+        priceWithDiscount *= 0.90; // 10% скидка
+      } else if (subscriptionMonths === 12) {
+        priceWithDiscount *= 0.85; // 15% скидка
+      }
+      
+      const amount = Math.round(priceWithDiscount);
+      
+      console.log(`Processing payment of ${amount} for ${subscriptionMonths} months of ${tariff.name} plan`);
+      
+      // Имитация оплаты
+      const paymentInfo = {
+        id: `payment-${Date.now()}`,
+        date: new Date().toISOString(),
+        amount,
+        description: `Подписка на тариф ${tariff.name} на ${subscriptionMonths} мес.`,
+        status: "completed",
+        tariff: tariff.name,
+        period: `${subscriptionMonths} мес.`
+      };
+      
+      console.log("Payment record created:", paymentInfo);
+      
+      // Сохраняем информацию о платеже в Supabase
+      const result = await saveTariffData(
+        selectedTariff,
+        user.id,
+        subscriptionMonths,
+        amount
+      );
+
+      if (result && result.success && result.user) {
+        // Обновляем локального пользователя
+        const updatedUser = {
+          ...user,
+          tariffId: selectedTariff,
+          isSubscriptionActive: true,
+          subscriptionEndDate: result.user.subscription_expiry
+        };
+        
+        onUserUpdated(updatedUser);
+        
+        // Обновляем локальное хранилище
+        const storageKey = localStorage.getItem('remember') === 'true' ? 'user' : 'sessionUser';
+        localStorage.setItem(storageKey, JSON.stringify(updatedUser));
         
         toast({
           title: "Подписка активирована",
@@ -35,11 +88,7 @@ const SubscriptionExpiredAlert: React.FC<SubscriptionExpiredAlertProps> = ({ use
           variant: "default",
         });
       } else {
-        toast({
-          title: "Ошибка",
-          description: result.message || "Не удалось активировать подписку",
-          variant: "destructive",
-        });
+        throw new Error(result?.error || "Не удалось активировать подписку");
       }
     } catch (error) {
       console.error("Error activating subscription:", error);
