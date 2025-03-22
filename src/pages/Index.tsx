@@ -11,7 +11,7 @@ import TipsSection from "@/components/dashboard/TipsSection";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import SubscriptionExpiredAlert from "@/components/subscription/SubscriptionExpiredAlert";
-import { hasFeatureAccess, getTrialDaysRemaining } from "@/services/userService";
+import { hasFeatureAccess } from "@/services/userService";
 import { PlusCircle } from "lucide-react";
 
 const Index = () => {
@@ -20,26 +20,22 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Загрузка данных пользователя
     const userJson = localStorage.getItem('user') || sessionStorage.getItem('user');
     if (userJson) {
       try {
         const user = JSON.parse(userJson);
         setUserData(user);
 
-        // Проверка доступа к функциям
         const canAccessAdvancedMetrics = hasFeatureAccess('advancedMetrics', user);
         setIsLimited(!canAccessAdvancedMetrics);
       } catch (error) {
         console.error('Ошибка при парсинге данных пользователя:', error);
       }
     } else {
-      // Если пользователь не авторизован, перенаправляем на главную
       navigate('/');
     }
   }, [navigate]);
 
-  // Если данные пользователя еще не загружены, показываем загрузку
   if (!userData) {
     return (
       <MainLayout>
@@ -50,12 +46,10 @@ const Index = () => {
     );
   }
 
-  // Функция для обработки создания нового магазина
   const handleCreateStore = () => {
     if (hasFeatureAccess('createStore', userData)) {
       navigate('/stores');
     } else {
-      // Если у пользователя нет доступа к созданию магазина, показываем сообщение
       console.log('Недостаточно прав для создания магазина');
     }
   };
@@ -83,7 +77,6 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Уведомление об истечении подписки, если применимо */}
         {userData && userData.isSubscriptionActive === false && !userData.isInTrial && (
           <SubscriptionExpiredAlert 
             user={userData} 
@@ -91,7 +84,6 @@ const Index = () => {
           />
         )}
 
-        {/* Основной контент дашборда */}
         <div className="space-y-8">
           <Dashboard />
           
