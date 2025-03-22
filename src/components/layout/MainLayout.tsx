@@ -45,7 +45,6 @@ const MainLayout = ({
     toggleTheme
   } = useTheme();
   const navigate = useNavigate();
-  
   const handleLogout = async () => {
     // Выход из Supabase (если пользователь авторизован)
     try {
@@ -53,7 +52,7 @@ const MainLayout = ({
     } catch (e) {
       console.error("Error signing out from Supabase:", e);
     }
-    
+
     // Удаляем данные пользователя из хранилища
     localStorage.removeItem('user');
     sessionStorage.removeItem('user');
@@ -61,7 +60,6 @@ const MainLayout = ({
     // Перенаправляем на главную страницу
     navigate('/');
   };
-  
   const handleMenuItemClick = (value: string) => {
     if (value === 'logout') {
       handleLogout();
@@ -77,7 +75,6 @@ const MainLayout = ({
     const tariff = initialTariffs.find(t => t.id === tariffId);
     return tariff ? tariff.name : `Тариф ${tariffId}`;
   };
-  
   const renderSubscriptionBadge = () => {
     if (!user) return null;
     if (user.isInTrial && trialDaysLeft > 0) {
@@ -87,13 +84,10 @@ const MainLayout = ({
         </Badge>;
     }
     if (user.isSubscriptionActive) {
-      return <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-200">
-          {getTariffName(user.tariffId)}
-        </Badge>;
+      return;
     }
     return null;
   };
-  
   return <div className="min-h-screen bg-background pb-16 md:pb-0">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b">
         {isMobile ? <div className="flex items-center justify-between p-4">
