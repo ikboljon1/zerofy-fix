@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
         setEmail(user.email);
         setPhone(user.phone || '');
         setCompany(user.company || '');
-        setStatus((user.status as 'active' | 'inactive') || 'active');
+        setStatus(user.status || 'active');
         setRole(user.role || 'user');
         setTariffId(user.tariffId);
         setIsSubscriptionActive(user.isSubscriptionActive);
@@ -76,6 +77,7 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
           setTrialDaysRemaining(trialDays);
         }
         
+        // Загружаем историю платежей пользователя
         loadPaymentHistory();
       } catch (error) {
         console.error("Failed to load user data:", error);
@@ -112,11 +114,13 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
   const handleActivateSubscription = async () => {
     setIsActivating(true);
     try {
+      // Находим выбранный тариф
       const tariff = initialTariffs.find(t => t.id === selectedTariff);
       if (!tariff) {
         throw new Error("Тариф не найден");
       }
       
+      // Рассчитываем стоимость с учетом скидки
       let priceWithDiscount = tariff.price * subscriptionMonths;
       
       if (subscriptionMonths === 3) {
@@ -131,6 +135,7 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
       
       console.log(`Admin processing payment of ${amount} for ${subscriptionMonths} months of ${tariff.name} plan`);
       
+      // Сохраняем информацию о платеже в Supabase через Admin интерфейс
       const result = await saveTariffData(
         selectedTariff || user.tariffId, 
         user.id, 
@@ -139,6 +144,7 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
       );
       
       if (result && result.success && result.user) {
+        // Обновляем локального пользователя
         const updatedUser = {
           ...user,
           tariffId: selectedTariff || user.tariffId,
@@ -148,6 +154,7 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
         
         onUserUpdated(updatedUser);
         
+        // Обновляем историю платежей
         loadPaymentHistory();
         
         toast({
@@ -187,8 +194,7 @@ const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
       const result = await updateUser(user.id, updatedUser);
 
       if (result) {
-        const updatedUserObj = result as unknown as User;
-        onUserUpdated(updatedUserObj);
+        onUserUpdated(result);
         
         toast({
           title: "Успешно",

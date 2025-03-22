@@ -1,77 +1,137 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+
+import React, { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { requestPasswordReset } from "@/services/userService";
-import { Mail } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Mail, ArrowLeft } from "lucide-react";
 
-const PasswordResetRequestForm = () => {
-  const [email, setEmail] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [isSuccess, setIsSuccess] = useState(false);
+const resetRequestSchema = z.object({
+  email: z.string().email({ message: "Введите корректный email" }),
+});
+
+interface PasswordResetRequestFormProps {
+  onBack: () => void;
+  onResetSent: (email: string) => void;
+}
+
+const PasswordResetRequestForm = ({
+  onBack,
+  onResetSent,
+}: PasswordResetRequestFormProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError("");
-    
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    getValues,
+  } = useForm<z.infer<typeof resetRequestSchema>>({
+    resolver: zodResolver(resetRequestSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  const onSubmit = async (data: z.infer<typeof resetRequestSchema>) => {
+    setIsLoading(true);
+
     try {
-      const result = await requestPasswordReset(email);
+      // Получаем реальный результат отправки запроса сброса пароля
+      const result = await requestPasswordReset(data.email);
       
-      // Update to handle the object response instead of boolean
       if (result.success) {
-        setIsSuccess(true);
+        setSuccess(true);
         toast({
-          title: "Ссылка отправлена",
-          description: "Проверьте вашу электронную почту. Ссылка для сброса пароля будет действительна в течение 24 часов.",
+          title: "Запрос отправлен",
+          description: "Инструкции по восстановлению пароля отправлены на указанный email",
         });
+        onResetSent(data.email);
       } else {
-        setError(result.message || "Произошла ошибка при отправке ссылки для сброса пароля.");
+        toast({
+          title: "Ошибка",
+          description: result.message || "Произошла ошибка при обработке запроса",
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      setError(error.message || "Произошла ошибка при отправке ссылки для сброса пароля.");
+    } catch (error) {
+      console.error("Ошибка при запросе сброса пароля:", error);
+      toast({
+        title: "Ошибка",
+        description: "Произошла ошибка при обработке запроса. Проверьте настройки SMTP.",
+        variant: "destructive",
+      });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <CardTitle>Запрос сброса пароля</CardTitle>
-        <CardDescription>
-          Введите свой email, и мы отправим вам ссылку для сброса пароля.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="Введите свой email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isSubmitting || isSuccess}
-          />
-        </div>
-        <Button disabled={isSubmitting || isSuccess} onClick={handleSubmit}>
-          {isSubmitting ? "Отправка..." : "Отправить ссылку"}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+      <div className="flex items-center mb-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="p-0 h-auto mr-2"
+          onClick={onBack}
+        >
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-        {error && <p className="text-red-500">{error}</p>}
-        {isSuccess && (
-          <p className="text-green-500">
-            Ссылка для сброса пароля отправлена на ваш email.
+        <h2 className="text-lg font-medium">Восстановление пароля</h2>
+      </div>
+
+      {success ? (
+        <Alert>
+          <AlertDescription>
+            Инструкции по восстановлению пароля отправлены на указанный email.
+            Пожалуйста, проверьте вашу почту и следуйте инструкциям.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground mb-4">
+            Введите email, указанный при регистрации, и мы отправим вам инструкции
+            по восстановлению пароля.
           </p>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="Введите ваш email"
+                className="pl-9"
+                {...register("email")}
+              />
+            </div>
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
+          </div>
+
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Отправка...
+              </>
+            ) : (
+              "Отправить инструкции"
+            )}
+          </Button>
+        </>
+      )}
+    </form>
   );
 };
 

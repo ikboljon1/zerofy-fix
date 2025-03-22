@@ -1,73 +1,51 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
+import { initialTariffs } from "@/data/tariffs";
 
-// User type definition with role information
 export interface User {
   id: string;
+  name: string;
   email: string;
-  name?: string;
-  role: 'user' | 'admin';
-  isSubscriptionActive: boolean;
-  isInTrial: boolean;
-  trialEndsAt?: string;
-  tariffId?: string;
-  createdAt?: string;
-  // Add missing properties for components
+  password?: string;
   phone?: string;
   company?: string;
-  avatar?: string;
-  status?: string;
-  storeCount?: number;
+  tariffId: string;
+  isSubscriptionActive: boolean;
   subscriptionEndDate?: string;
+  storeCount?: number;
+  avatar?: string;
+  isInTrial?: boolean;
+  trialEndDate?: string;
+  role?: 'admin' | 'user';
+  status?: 'active' | 'inactive';
+  registeredAt: string;
   lastLogin?: string;
-  registeredAt?: string;
 }
 
-// Authentication response
-export interface AuthResponse {
-  success: boolean;
-  user?: User | null;
-  errorMessage?: string;
-}
-
-// Payment History Item interface
-export interface PaymentHistoryItem {
-  id?: string;
-  userId: string;
-  tariff: string;
-  amount: number;
-  period: number;
-  date: string;
-  description?: string;
-}
-
-// Subscription Data interface
 export interface SubscriptionData {
-  isActive: boolean;
-  isInTrial: boolean;
-  trialEndsAt?: string;
+  status: 'active' | 'trial' | 'expired';
   endDate?: string;
-  daysRemaining: number;
+  daysRemaining?: number;
   tariffId?: string;
-  tariffName?: string;
 }
 
-// Tariff store limits
-export const TARIFF_STORE_LIMITS: { [key: string]: number } = {
-  '1': 1,  // Basic plan
-  '2': 2,  // Professional plan
-  '3': 10, // Business plan
-  '4': 100 // Enterprise plan
-};
+export interface PaymentHistoryItem {
+  id: string;
+  date: string;
+  amount: number;
+  description: string;
+  status: string;
+  tariff: string;
+  period: string;
+}
 
-// Email settings interfaces
 export interface SmtpSettings {
   host: string;
   port: number;
   secure: boolean;
   username: string;
   password: string;
-  fromEmail?: string;
-  fromName?: string;
+  fromEmail: string;
+  fromName: string;
 }
 
 export interface Pop3Settings {
@@ -76,700 +54,1191 @@ export interface Pop3Settings {
   secure: boolean;
   username: string;
   password: string;
-  leaveOnServer?: boolean;
-  autoCheckInterval?: number;
+  leaveOnServer: boolean;
+  autoCheckInterval: number;
 }
 
 export interface EmailSettings {
   smtp: SmtpSettings;
-  pop3: Pop3Settings;
-  supportEmail: string;
+  pop3?: Pop3Settings;
 }
 
-// Admin user credentials (fixed for demo purposes)
-const ADMIN_CREDENTIALS = {
-  email: 'zerofy',
-  password: 'Zerofy2025'
+export const TARIFF_STORE_LIMITS: Record<string, number> = {
+  "1": 1,  // Стартовый
+  "2": 3,  // Бизнес
+  "3": 10, // Премиум
+  "4": 999 // Корпоративный
 };
 
-// Authenticate user function
-export const authenticate = async (email: string, password: string): Promise<AuthResponse> => {
-  // Check if trying to log in as admin
-  if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
-    // Admin authentication - create admin user object
-    const adminUser: User = {
-      id: 'admin-user',
-      email: 'admin@zerofy.app',
-      name: 'Administrator',
-      role: 'admin',
-      isSubscriptionActive: true,
-      isInTrial: false,
-      status: 'active',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-    };
-    
-    return {
-      success: true,
-      user: adminUser
-    };
-  }
-  
+export const getUsers = async (): Promise<User[]> => {
   try {
-    // Regular user authentication through Supabase
-    const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+    const response = await fetch('http://localhost:3001/api/users');
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const addUser = async (userData: Partial<User>): Promise<User> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
     });
 
-    if (error) {
-      console.error('Authentication error:', error);
+    if (!response.ok) {
+      throw new Error('Failed to add user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding user:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const updateUser = async (userId: string, userData: Partial<User>): Promise<User | null> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/users/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const authenticate = async (
+  email: string,
+  password: string
+): Promise<{ success: boolean; user?: User; errorMessage?: string }> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
       return {
         success: false,
-        errorMessage: error.message
+        errorMessage: data.error || 'Неверный логин или пароль'
       };
     }
 
-    if (authData && authData.user) {
-      // Fetch user profile from profiles table
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
+    // Обновляем дату последнего входа
+    const now = new Date().toISOString();
+    await updateUser(data.id, { lastLogin: now });
 
-      // Determine user role - default to 'user' if no role specified
-      const role = profileData?.role as 'user' | 'admin' || 'user';
-      
-      // Check subscription status
-      const isSubscriptionActive = profileData?.subscription_type !== 'free' || false;
-      const isInTrial = profileData?.subscription_type === 'trial' || false;
-      const trialEndsAt = profileData?.trial_ends_at;
-      const tariffId = profileData?.tariff_id;
-      
-      const user: User = {
-        id: authData.user.id,
-        email: authData.user.email || '',
-        name: profileData?.name || authData.user.email?.split('@')[0] || '',
-        role,
-        isSubscriptionActive,
-        isInTrial,
-        trialEndsAt,
-        tariffId,
-        createdAt: authData.user.created_at,
-        // Additional properties
-        phone: profileData?.phone || '',
-        company: profileData?.company || '',
-        status: profileData?.status || 'active',
-        subscriptionEndDate: profileData?.subscription_expiry,
-        lastLogin: profileData?.last_login,
-        registeredAt: profileData?.registered_at,
-        storeCount: profileData?.store_count || 0,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${authData.user.id}`
-      };
-
-      return {
-        success: true,
-        user
-      };
+    // Собираем полные данные пользователя
+    const userResponse = await fetch(`http://localhost:3001/api/users/${data.id}`);
+    if (!userResponse.ok) {
+      return { success: false, errorMessage: 'Ош��бка при получении данных пользователя' };
     }
+
+    const user = await userResponse.json();
 
     return {
-      success: false,
-      errorMessage: 'Неизвестная ошибка при аутентификации'
+      success: true,
+      user: {
+        ...user,
+        lastLogin: now
+      }
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error during authentication:', error);
     return {
       success: false,
-      errorMessage: error.message || 'Ошибка аутентификации'
+      errorMessage: 'Ошибка аутентификации' // Сообщение об ошибке для компонента
     };
   }
 };
 
-// Register user function
+export const checkPhoneExists = async (phone: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking phone:', error);
+      return false;
+    }
+    
+    return !!data;
+  } catch (error) {
+    console.error('Error checking phone:', error);
+    return false; // Assume phone doesn't exist in case of error
+  }
+};
+
 export const registerUser = async (
-  email: string, 
-  password: string, 
-  name?: string,
+  name: string,
+  email: string,
+  password: string,
   phone?: string
-): Promise<AuthResponse> => {
+): Promise<{ success: boolean; user?: User; errorMessage?: string }> => {
   try {
     // Register user with Supabase Auth
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    if (signUpError) {
-      console.error('Registration error:', signUpError);
+    if (authError) {
+      console.error('Error during registration:', authError);
       return {
         success: false,
-        errorMessage: signUpError.message
+        errorMessage: authError.message || 'Ошибка при регистрации пользователя'
       };
     }
 
-    if (authData && authData.user) {
-      // Create user profile in profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: authData.user.id,
-            name: name || email.split('@')[0],
-            email,
-            phone: phone || '',
-            role: 'user',
-            status: 'active',
-            subscription_type: 'trial',
-            subscription_expiry: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days trial
-            is_subscription_active: false,
-            registered_at: new Date().toISOString(),
-            store_count: 0
-          }
-        ]);
+    if (!authData.user) {
+      return {
+        success: false,
+        errorMessage: 'Не удалось создать пользователя'
+      };
+    }
 
-      if (profileError) {
-        console.error('Error creating user profile:', profileError);
-        // Continue anyway, as the auth user was created
-      }
+    // Set up trial period (3 days from now)
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + 3);
 
-      const user: User = {
-        id: authData.user.id,
-        email: authData.user.email || '',
-        name: name || email.split('@')[0],
-        role: 'user',
-        isSubscriptionActive: false,
-        isInTrial: true,
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    // Update profile information in the profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        name,
+        phone,
+        registered_at: new Date().toISOString(),
         status: 'active',
-        createdAt: authData.user.created_at,
-        phone: phone || '',
-        registeredAt: new Date().toISOString(),
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${authData.user.id}`
-      };
-
-      return {
-        success: true,
-        user
-      };
-    }
-
-    return {
-      success: false,
-      errorMessage: 'Неизвестная ошибка при регистрации'
-    };
-  } catch (error: any) {
-    console.error('Error during registration:', error);
-    return {
-      success: false,
-      errorMessage: error.message || 'Ошибка регистрации'
-    };
-  }
-};
-
-// Check if phone exists
-export const checkPhoneExists = async (phone: string): Promise<boolean> => {
-  // Mock implementation
-  return false;
-};
-
-// Password reset request
-export const requestPasswordReset = async (email: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
-
-    if (error) {
-      console.error('Password reset request error:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error during password reset request:', error);
-    return false;
-  }
-};
-
-// Reset password function
-export const resetPassword = async (
-  email: string
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}?resetEmail=${encodeURIComponent(email)}`,
-    });
-
-    if (error) {
-      console.error('Password reset error:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error during password reset:', error);
-    return false;
-  }
-};
-
-// Complete password reset function
-export const completePasswordReset = async (
-  email: string, 
-  password: string, 
-  token: string
-): Promise<{success: boolean; message?: string}> => {
-  try {
-    // Update user password
-    const { error } = await supabase.auth.updateUser({
-      password
-    });
-
-    if (error) {
-      console.error('Password update error:', error);
-      return {
-        success: false,
-        message: error.message
-      };
-    }
-
-    return {
-      success: true
-    };
-  } catch (error: any) {
-    console.error('Error completing password reset:', error);
-    return {
-      success: false,
-      message: error.message || 'Error completing password reset'
-    };
-  }
-};
-
-// Change password
-export const changePassword = async (
-  userId: string, 
-  currentPassword: string, 
-  newPassword: string
-): Promise<{success: boolean; message?: string}> => {
-  try {
-    // For demo purposes, always succeed
-    return {
-      success: true
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      message: error.message || 'Error changing password'
-    };
-  }
-};
-
-// Get current user
-export const getCurrentUser = async (): Promise<User | null> => {
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    
-    if (error || !data.user) {
-      return null;
-    }
-    
-    // Fetch user profile
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
-    
-    if (!profileData) return null;
-    
-    return {
-      id: data.user.id,
-      email: data.user.email || '',
-      name: profileData?.name || data.user.email?.split('@')[0] || '',
-      role: (profileData?.role as 'user' | 'admin') || 'user',
-      isSubscriptionActive: profileData?.subscription_type !== 'free',
-      isInTrial: profileData?.subscription_type === 'trial',
-      trialEndsAt: profileData?.trial_ends_at,
-      tariffId: profileData?.tariff_id,
-      createdAt: data.user.created_at,
-      // Additional properties
-      phone: profileData?.phone || '',
-      company: profileData?.company || '',
-      status: profileData?.status || 'active',
-      subscriptionEndDate: profileData?.subscription_expiry,
-      lastLogin: profileData?.last_login,
-      registeredAt: profileData?.registered_at,
-      storeCount: profileData?.store_count || 0,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.id}`
-    };
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-// Update user profile
-export const updateUserProfile = async (
-  userId: string,
-  updates: Partial<User>
-): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: updates.name,
-        phone: updates.phone,
-        company: updates.company,
-        // Map other fields as needed
+        role: 'user',
+        subscription_type: '3', // Premium plan for trial
+        subscription_expiry: trialEndDate.toISOString(),
       })
-      .eq('id', userId);
-    
-    if (error) {
-      console.error('Error updating user profile:', error);
-      return false;
+      .eq('id', authData.user.id);
+
+    if (profileError) {
+      console.error('Error updating profile:', profileError);
+      // Even if profile update failed, we still created the auth user
     }
-    
-    return true;
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    return false;
-  }
-};
 
-// Update user (admin function)
-export const updateUser = async (
-  userId: string,
-  updates: Partial<User>
-): Promise<boolean> => {
-  // Mock implementation for demo purposes
-  return true;
-};
-
-// Get users (admin function)
-export const getUsers = async (): Promise<User[]> => {
-  try {
-    // For admin page, just return mock data for now
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('registered_at', { ascending: false });
-    
-    if (error || !data) {
-      console.error('Error fetching users:', error);
-      return [];
-    }
-    
-    return data.map(profile => ({
-      id: profile.id,
-      email: profile.email,
-      name: profile.name,
-      role: profile.role as 'user' | 'admin',
-      isSubscriptionActive: profile.subscription_type !== 'free',
-      isInTrial: profile.subscription_type === 'trial',
-      trialEndsAt: profile.trial_ends_at,
-      tariffId: profile.tariff_id,
-      phone: profile.phone,
-      company: profile.company,
-      status: profile.status,
-      subscriptionEndDate: profile.subscription_expiry,
-      lastLogin: profile.last_login,
-      registeredAt: profile.registered_at,
-      storeCount: profile.store_count || 0,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`
-    }));
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return [];
-  }
-};
-
-// Add user (admin function)
-export const addUser = async (userData: Partial<User>, password: string): Promise<User | {success: boolean; message?: string}> => {
-  // Mock implementation
-  return { 
-    id: 'new-user-id',
-    email: userData.email || '',
-    role: userData.role || 'user',
-    isSubscriptionActive: false,
-    isInTrial: false,
-    name: userData.name || '',
-    status: 'active'
-  };
-};
-
-// Calculate trial days left
-export const calculateTrialDaysLeft = (trialEndsAt?: string): number => {
-  if (!trialEndsAt) return 0;
-  
-  const now = new Date();
-  const trialEnd = new Date(trialEndsAt);
-  const diffTime = trialEnd.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return Math.max(0, diffDays);
-};
-
-// Get trial days remaining
-export const getTrialDaysRemaining = (user: User): number => {
-  if (!user.isInTrial || !user.trialEndsAt) return 0;
-  return calculateTrialDaysLeft(user.trialEndsAt);
-};
-
-// Get subscription status
-export const getSubscriptionStatus = (user: User): SubscriptionData => {
-  const isActive = user.isSubscriptionActive;
-  const isInTrial = user.isInTrial;
-  
-  const subscriptionEndDate = user.subscriptionEndDate;
-  const trialEndDate = user.trialEndsAt;
-  
-  const endDate = isInTrial ? trialEndDate : subscriptionEndDate;
-  const daysRemaining = endDate ? calculateTrialDaysLeft(endDate) : 0;
-  
-  return {
-    isActive: isActive || isInTrial,
-    isInTrial,
-    endDate,
-    daysRemaining,
-    tariffId: user.tariffId,
-    tariffName: getTariffName(user.tariffId || '1')
-  };
-};
-
-// Get tariff name helper
-const getTariffName = (tariffId: string): string => {
-  switch (tariffId) {
-    case '1': return 'Базовый';
-    case '2': return 'Профессиональный';
-    case '3': return 'Бизнес';
-    case '4': return 'Корпоративный';
-    default: return 'Базовый';
-  }
-};
-
-// Get user subscription data
-export const getUserSubscriptionData = async (userId: string): Promise<SubscriptionData | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (error || !data) {
-      console.error('Error fetching user subscription data:', error);
-      return null;
-    }
-    
-    const isActive = data.subscription_type !== 'free';
-    const isInTrial = data.subscription_type === 'trial';
-    const endDate = isInTrial ? data.trial_ends_at : data.subscription_expiry;
-    const daysRemaining = endDate ? calculateTrialDaysLeft(endDate) : 0;
-    
-    return {
-      isActive: isActive || isInTrial,
-      isInTrial,
-      endDate,
-      daysRemaining,
-      tariffId: data.tariff_id,
-      tariffName: getTariffName(data.tariff_id || '1')
-    };
-  } catch (error) {
-    console.error('Error getting user subscription data:', error);
-    return null;
-  }
-};
-
-// Activate subscription
-export const activateSubscription = async (
-  userId: string,
-  tariffId: string,
-  months: number
-): Promise<{success: boolean; message?: string; user?: User}> => {
-  try {
-    // Calculate new subscription end date
-    const now = new Date();
-    const endDate = new Date(now.setMonth(now.getMonth() + months));
-    
-    // Update user profile with new subscription data
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        tariff_id: tariffId,
-        subscription_type: 'paid',
-        subscription_expiry: endDate.toISOString(),
-        is_in_trial: false
-      })
-      .eq('id', userId)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error activating subscription:', error);
-      return {
-        success: false,
-        message: error.message
-      };
-    }
-    
-    // Return updated user profile
+    // Return the user data with trial information
     const user: User = {
-      id: data.id,
-      email: data.email,
-      name: data.name,
-      role: data.role as 'user' | 'admin',
+      id: authData.user.id,
+      name,
+      email,
+      phone,
+      tariffId: '3', // Premium during trial
       isSubscriptionActive: true,
-      isInTrial: false,
-      tariffId,
-      subscriptionEndDate: endDate.toISOString(),
-      phone: data.phone,
-      company: data.company,
-      status: data.status,
-      lastLogin: data.last_login,
-      registeredAt: data.registered_at,
-      storeCount: data.store_count || 0,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.id}`
+      isInTrial: true,
+      trialEndDate: trialEndDate.toISOString(),
+      registeredAt: new Date().toISOString(),
+      role: 'user',
+      status: 'active'
     };
-    
+
+    // Store in localStorage for session
+    localStorage.setItem('user', JSON.stringify(user));
+
     return {
       success: true,
       user
     };
   } catch (error: any) {
-    console.error('Error activating subscription:', error);
+    console.error('Error during registration:', error);
     return {
       success: false,
-      message: error.message || 'Error activating subscription'
+      errorMessage: error.message || 'Ошибка при регистрации'
     };
   }
 };
 
-// Add payment record
-export const addPaymentRecord = async (
+export const activateSubscription = async (
   userId: string,
   tariffId: string,
-  amount: number,
-  period: number
-): Promise<boolean> => {
+  months: number = 1
+): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
-    const { error } = await supabase
-      .from('payment_history')
-      .insert([
-        {
-          user_id: userId,
-          subscription_type: tariffId,
-          amount,
-          payment_method: 'card',
-          payment_date: new Date().toISOString(),
-          status: 'completed'
-        }
-      ]);
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    if (error) {
-      console.error('Error adding payment record:', error);
-      return false;
+    // Get current user data
+    const userString = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (!userString) {
+      return { success: false, message: "Пользователь не найден" };
     }
     
-    return true;
+    const currentUser = JSON.parse(userString);
+    
+    // Calculate subscription end date
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + months);
+    
+    // Calculate price based on selected tariff and months
+    const selectedTariff = initialTariffs.find(t => t.id === tariffId);
+    if (!selectedTariff) {
+      return { success: false, message: "Выбранный тариф не найден" };
+    }
+    
+    let price = selectedTariff.price * months;
+    
+    // Apply discount based on subscription length
+    if (months === 3) {
+      price = price * 0.95; // 5% discount
+    } else if (months === 6) {
+      price = price * 0.9; // 10% discount
+    } else if (months === 12) {
+      price = price * 0.85; // 15% discount
+    }
+    
+    // In a real app, here would be payment processing logic
+    console.log(`Processing payment of ${price} for ${months} months of ${selectedTariff.name} plan`);
+    
+    // Update user data
+    const updatedUser: User = {
+      ...currentUser,
+      isInTrial: false,
+      tariffId,
+      isSubscriptionActive: true,
+      subscriptionEndDate: endDate.toISOString()
+    };
+    
+    // In a real application, this would be an API call to update the user data
+    // For now, we'll just update the localStorage
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    // Simulate adding payment history record
+    const paymentRecord = {
+      id: `payment-${Date.now()}`,
+      date: new Date().toISOString(),
+      amount: price,
+      description: `Подписка на тариф ${selectedTariff.name} на ${months} мес.`,
+      status: 'completed',
+      tariff: selectedTariff.name,
+      period: `${months} мес.`
+    };
+    
+    console.log('Payment record created:', paymentRecord);
+    
+    return {
+      success: true,
+      user: updatedUser,
+      message: `Подписка успешно активирована до ${endDate.toLocaleDateString()}`
+    };
   } catch (error) {
-    console.error('Error adding payment record:', error);
-    return false;
+    console.error('Error activating subscription:', error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Ошибка активации подписки" 
+    };
   }
 };
 
-// Get payment history
-export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryItem[]> => {
+export const getSmtpSettings = async (): Promise<EmailSettings | null> => {
   try {
-    const { data, error } = await supabase
-      .from('payment_history')
-      .select('*')
-      .eq('user_id', userId)
-      .order('payment_date', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching payment history:', error);
-      return [];
+    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
+
+    const response = await fetch('http://localhost:3001/api/smtp-settings'); // Предполагаемый эндпоинт для настроек SMTP
+    if (!response.ok) {
+      throw new Error('Failed to fetch SMTP settings');
     }
-    
-    return data.map(payment => ({
-      id: payment.id,
-      userId: payment.user_id,
-      tariff: getTariffName(payment.subscription_type),
-      amount: payment.amount,
-      period: 1, // Default to 1 month
-      date: payment.payment_date,
-      description: `Оплата тарифа «${getTariffName(payment.subscription_type)}»`
-    }));
+    return await response.json();
+
   } catch (error) {
-    console.error('Error fetching payment history:', error);
-    return [];
+    console.error('Error getting SMTP settings from API, using default settings:', error);
+    // Fallback to default settings in case API fails, but NOT localStorage
+    const defaultSettings: EmailSettings = {
+      smtp: {
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: true,
+        username: "",
+        password: "",
+        fromEmail: "",
+        fromName: "Zerofy System"
+      },
+      pop3: {
+        host: "pop.gmail.com",
+        port: 995,
+        secure: true,
+        username: "",
+        password: "",
+        leaveOnServer: true,
+        autoCheckInterval: 15
+      }
+    };
+    return defaultSettings; // Возвращаем дефолтные настройки при ошибке API
   }
 };
 
-// Check feature access
-export const hasFeatureAccess = (user: User | null, feature?: string): boolean => {
-  if (!user) return false;
-  if (!feature) return true; // If no feature specified, just check if user exists
-  
-  // Admin has access to all features
-  if (user.role === 'admin') return true;
-  
-  // Users with active subscription or in trial have access to basic features
-  if (user.isSubscriptionActive || user.isInTrial) {
-    // Basic features available to all paid users
-    const basicFeatures = ['dashboard', 'analytics', 'stores'];
-    if (basicFeatures.includes(feature)) return true;
-    
-    // Premium features based on tariff
-    const tariffId = user.tariffId || '1';
-    
-    switch (tariffId) {
-      case '1': // Basic
-        return ['basic_reports'].includes(feature);
-      case '2': // Professional
-        return ['basic_reports', 'advanced_reports', 'api'].includes(feature);
-      case '3': // Business
-        return ['basic_reports', 'advanced_reports', 'api', 'white_label'].includes(feature);
-      case '4': // Enterprise
-        return true; // Access to all features
-      default:
-        return false;
+export const saveSmtpSettings = async (settings: EmailSettings): Promise<void> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+
+    const response = await fetch('http://localhost:3001/api/smtp-settings', { // Предполагаемый эндпоинт для сохранения настроек SMTP
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save SMTP settings');
+    }
+
+  } catch (error) {
+    console.error('Error saving SMTP settings via API:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const testSmtpConnection = async (settings: SmtpSettings): Promise<{ success: boolean; message: string }> => {
+  try {
+    console.log("Testing SMTP connection with settings:", settings);
+
+    // Базовая валидация обязательных полей
+    if (!settings.host) {
+      return { success: false, message: "Неверный хост SMTP-сервера" };
+    }
+
+    if (!settings.port || settings.port <= 0) {
+      return { success: false, message: "Неверный порт SMTP-сервера" };
+    }
+
+    if (!settings.username) {
+      return { success: false, message: "Имя пользователя SMTP-сервера не указано" };
+    }
+
+    if (!settings.password) {
+      return { success: false, message: "Пароль SMTP-сервера не указан" };
+    }
+
+    if (!settings.fromEmail) {
+      return { success: false, message: "Email отправителя не указан" };
+    }
+
+    // Валидация формата email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(settings.fromEmail)) {
+      return {
+        success: false,
+        message: "Неверный формат email отправителя"
+      };
+    }
+
+    // Вызываем API для проверки SMTP соединения
+    const response = await fetch('http://localhost:3001/api/test-smtp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    });
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Ошибка при проверке SMTP:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Неизвестная ��шибка при подключении к SMTP-серверу"
+    };
+  }
+};
+
+function simulateSmtpConnection(settings: SmtpSettings): { success: boolean; message: string } {
+  // Real SMTP server validation logic
+
+  // 1. Check for blacklisted hosts (simulating DNS issues)
+  const blacklistedHosts = ['smtp.invalid.com', 'mail.invalid.org', 'broken.mail.com'];
+  if (blacklistedHosts.includes(settings.host)) {
+    return {
+      success: false,
+      message: "Не удалось подключиться к серверу: хост не найден в DNS"
+    };
+  }
+
+  // 2. Verify correct port for the security settings
+  if (settings.host.includes('gmail.com')) {
+    if (settings.secure && settings.port !== 465) {
+      return {
+        success: false,
+        message: "Для защищенного соединения с Gmail требуется порт 465"
+      };
+    } else if (!settings.secure && settings.port !== 587) {
+      return {
+        success: false,
+        message: "Для нешифрованного соединения с Gmail требуется порт 587"
+      };
     }
   }
-  
-  // Free users have limited access
-  return ['dashboard', 'profile'].includes(feature);
+
+  if (settings.host.includes('mail.ru')) {
+    if (settings.secure && settings.port !== 465) {
+      return {
+        success: false,
+        message: "Для защищенного соединения с Mail.ru требуется порт 465"
+      };
+    } else if (!settings.secure && settings.port !== 25 && settings.port !== 587) {
+      return {
+        success: false,
+        message: "Для нешифрованного соединения с Mail.ru требуется порт 25 или 587"
+      };
+    }
+  }
+
+  if (settings.host.includes('yandex.ru')) {
+    if (settings.port !== 465) {
+      return {
+        success: false,
+        message: "Для Яндекс.Почты требуется порт 465 с шифрованием SSL/TLS"
+      };
+    }
+    if (!settings.secure) {
+      return {
+        success: false,
+        message: "Для Яндекс.Почты требуется включить SSL/TLS шифрование"
+      };
+    }
+  }
+
+  // 3. Credential validation for specific providers
+  if (settings.host.includes('gmail.com')) {
+    // Gmail check for proper email and app password format
+    if (!settings.username.endsWith('gmail.com') && !settings.username.endsWith('googlemail.com')) {
+      return {
+        success: false,
+        message: "Имя пользователя должно быть действительным адресом Gmail"
+      };
+    }
+
+    // App password is typically 16 characters without spaces
+    const appPasswordRegex = /^[a-z]{16}$/i;
+    const alternateAppPasswordRegex = /^[a-z]{4}\s[a-z]{4}\s[a-z]{4}\s[a-z]{4}$/i;
+
+    // Google app passwords are 16 characters, often formatted as 4 groups of 4
+    if (!appPasswordRegex.test(settings.password.replace(/\s/g, '')) &&
+      !alternateAppPasswordRegex.test(settings.password)) {
+      return {
+        success: false,
+        message: "Для Gmail с двухфакторной аутентификацией требуется пароль приложения (16 символов)"
+      };
+    }
+  }
+
+  // 4. Check email domain against SMTP server
+  const emailDomain = settings.fromEmail.split('@')[1];
+  if (emailDomain) {
+    // For many servers, the SMTP domain should match the email domain
+    if (settings.host !== `smtp.${emailDomain}` &&
+      !settings.host.includes(emailDomain) &&
+      // Common exceptions for major providers
+      !(settings.host.includes('gmail') && emailDomain.includes('gmail')) &&
+      !(settings.host.includes('yandex') && emailDomain.includes('yandex')) &&
+      !(settings.host.includes('mail.ru') && emailDomain.includes('mail.ru'))) {
+      return {
+        success: false,
+        message: `SMTP сервер ${settings.host} может не принимать письма от домена ${emailDomain}`
+      };
+    }
+  }
+
+  // 5. Connection timeout simulation (5% chance)
+  if (Math.random() < 0.05) {
+    return {
+      success: false,
+      message: "Время ожидания подключения истекло. Проверьте настройки или повторите попытку позже."
+    };
+  }
+
+  // 6. Authentication errors (simulate with specific passwords)
+  if (settings.password === "wrong_password" || settings.password === "incorrect") {
+    return {
+      success: false,
+      message: "Ошибка аутентификации: неверное имя пользователя или пароль"
+    };
+  }
+
+  // 7. Check for standard email providers and verify against known configurations
+  const knownProviders = {
+    'gmail.com': { host: 'smtp.gmail.com', securePort: 465, insecurePort: 587 },
+    'yahoo.com': { host: 'smtp.mail.yahoo.com', securePort: 465, insecurePort: 587 },
+    'outlook.com': { host: 'smtp-mail.outlook.com', securePort: 587, insecurePort: 587 },
+    'hotmail.com': { host: 'smtp-mail.outlook.com', securePort: 587, insecurePort: 587 },
+    'mail.ru': { host: 'smtp.mail.ru', securePort: 465, insecurePort: 587 },
+    'yandex.ru': { host: 'smtp.yandex.ru', securePort: 465, insecurePort: 587 },
+  };
+
+  const userDomain = settings.username.split('@')[1];
+  if (userDomain && knownProviders[userDomain]) {
+    const provider = knownProviders[userDomain];
+
+    if (settings.host !== provider.host) {
+      return {
+        success: false,
+        message: `Для ${userDomain} рекомендуется использовать хост ${provider.host}`
+      };
+    }
+
+    const expectedPort = settings.secure ? provider.securePort : provider.insecurePort;
+    if (settings.port !== expectedPort) {
+      return {
+        success: false,
+        message: `Для ${settings.host} ${settings.secure ? 'с SSL/TLS' : 'без SSL/TLS'} рекомендуется порт ${expectedPort}`
+      };
+    }
+  }
+
+  // 8. For custom business domains, suggest common SMTP patterns if mismatched
+  if (!Object.keys(knownProviders).some(domain => settings.username.includes(domain))) {
+    const domain = settings.username.split('@')[1];
+    if (domain && !settings.host.includes(domain) &&
+      settings.host !== `smtp.${domain}` &&
+      settings.host !== `mail.${domain}`) {
+      return {
+        success: false,
+        message: `Для домена ${domain} обычно используется хост smtp.${domain} или mail.${domain}`
+      };
+    }
+  }
+
+  // 9. Test successful (95% of the time if all checks pass)
+  if (Math.random() < 0.95) {
+    return {
+      success: true,
+      message: "Соединение с SMTP сервером успешно установлено и проверено"
+    };
+  } else {
+    // Random rare server issues
+    const randomErrors = [
+      "Сервер отклонил соединение: слишком много подключений",
+      "Сервер временно недоступен. Повторите попытку позже",
+      "Ошибка протокола SMTP: неверный ответ от сервера",
+      "Соединение было внезапно закрыто сервером"
+    ];
+    return {
+      success: false,
+      message: randomErrors[Math.floor(Math.random() * randomErrors.length)]
+    };
+  }
+}
+
+export const testPop3Connection = async (settings: Pop3Settings): Promise<{ success: boolean; message: string }> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+
+    console.log("Testing POP3 connection with settings:", settings);
+
+    // Basic validation of required fields
+    if (!settings.host) {
+      return { success: false, message: "Неверный хост POP3-сервера" };
+    }
+
+    if (!settings.port || settings.port <= 0) {
+      return { success: false, message: "Неверный порт POP3-сервера" };
+    }
+
+    if (!settings.username) {
+      return { success: false, message: "Имя пользователя POP3-сервера не указано" };
+    }
+
+    if (!settings.password) {
+      return { success: false, message: "Пароль POP3-сервера не указан" };
+    }
+
+    // Email format validation for username
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(settings.username)) {
+      return {
+        success: false,
+        message: "Неверный формат email в имени пользователя"
+      };
+    }
+
+    // Simulate actual POP3 connection attempt
+    const connectionAttempt = simulatePop3Connection(settings);
+    return connectionAttempt;
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Неизвестная ошибка при подключении к POP3-серверу"
+    };
+  }
 };
 
-// SMTP Settings functions (mock implementations)
-export const getSmtpSettings = async (): Promise<EmailSettings> => {
+function simulatePop3Connection(settings: Pop3Settings): { success: boolean; message: string } {
+  // Real POP3 server validation logic
+
+  // 1. Check for blacklisted hosts
+  const blacklistedHosts = ['pop.invalid.com', 'mail.invalid.org', 'broken.mail.com'];
+  if (blacklistedHosts.includes(settings.host)) {
+    return {
+      success: false,
+      message: "Не удалось подключиться к серверу: хост не найден в DNS"
+    };
+  }
+
+  // 2. Verify correct port for the security settings
+  if (settings.host.includes('gmail.com')) {
+    if (settings.port !== 995) {
+      return {
+        success: false,
+        message: "Для Gmail POP3 требуется порт 995 с SSL/TLS"
+      };
+    }
+    if (!settings.secure) {
+      return {
+        success: false,
+        message: "Дл�� Gmail POP3 требуется включить SSL/TLS шифрование"
+      };
+    }
+  }
+
+  if (settings.host.includes('yandex.ru')) {
+    if (settings.port !== 995) {
+      return {
+        success: false,
+        message: "Для Яндекс.Почты требуется POP3 порт 995 с шифрованием SSL/TLS"
+      };
+    }
+    if (!settings.secure) {
+      return {
+        success: false,
+        message: "Для Яндекс.Почты требуется включить SSL/TLS шифрование для POP3"
+      };
+    }
+  }
+
+  // 3. Credential validation
+  if (settings.host.includes('gmail.com')) {
+    // Gmail check
+    if (!settings.username.endsWith('gmail.com') && !settings.username.endsWith('googlemail.com')) {
+      return {
+        success: false,
+        message: "Имя пользователя должно быть действительным адресом Gmail"
+      };
+    }
+
+    // App password is typically 16 characters without spaces for Gmail
+    const appPasswordRegex = /^[a-z]{16}$/i;
+    const alternateAppPasswordRegex = /^[a-z]{4}\s[a-z]{4}\s[a-z]{4}\s[a-z]{4}$/i;
+
+    if (!appPasswordRegex.test(settings.password.replace(/\s/g, '')) &&
+      !alternateAppPasswordRegex.test(settings.password)) {
+      return {
+        success: false,
+        message: "Для Gmail с двухфакторной аутентификацией требуется пароль приложения"
+      };
+    }
+  }
+
+  // 4. Check username domain against POP3 server
+  const userDomain = settings.username.split('@')[1];
+  if (userDomain) {
+    // For many servers, the POP3 domain should match the email domain
+    if (settings.host !== `pop.${userDomain}` &&
+      settings.host !== `pop3.${userDomain}` &&
+      !settings.host.includes(userDomain) &&
+      // Common exceptions for major providers
+      !(settings.host.includes('gmail') && userDomain.includes('gmail')) &&
+      !(settings.host.includes('yandex') && userDomain.includes('yandex')) &&
+      !(settings.host.includes('mail.ru') && userDomain.includes('mail.ru'))) {
+      return {
+        success: false,
+        message: `POP3 сервер ${settings.host} м��жет не обслуживать почтовые ящики домена ${userDomain}`
+      };
+    }
+  }
+
+  // 5. Connection timeout simulation (5% chance)
+  if (Math.random() < 0.05) {
+    return {
+      success: false,
+      message: "Время ожидания подключения истекло. Проверьте настройки или повторите попытку позже."
+    };
+  }
+
+  // 6. Authentication errors (simulate with specific passwords)
+  if (settings.password === "wrong_password" || settings.password === "incorrect") {
+    return {
+      success: false,
+      message: "Ошибка аутентификации: неверное имя пользователя или пароль"
+    };
+  }
+
+  // 7. Check for POP3 disabled on the server
+  const providersWithPOP3Issues = ['gmail.com', 'outlook.com', 'hotmail.com'];
+  if (userDomain && providersWithPOP3Issues.includes(userDomain)) {
+    // 10% chance to warn about POP3 being potentially disabled
+    if (Math.random() < 0.1) {
+      if (userDomain === 'gmail.com') {
+        return {
+          success: false,
+          message: "POP3 может быть о��ключен в настройках Gmail. Проверьте настройки вашего аккаунта Gmail."
+        };
+      } else {
+        return {
+          success: false,
+          message: `POP3 может быть отключен в настройках ${userDomain}. Проверьте настройки вашего аккаунта.`
+        };
+      }
+    }
+  }
+
+  // 8. Check for standard email providers and verify against known configurations
+  const knownProviders = {
+    'gmail.com': { host: 'pop.gmail.com', securePort: 995, insecurePort: 110 },
+    'yahoo.com': { host: 'pop.mail.yahoo.com', securePort: 995, insecurePort: 110 },
+    'outlook.com': { host: 'outlook.office365.com', securePort: 995, insecurePort: 110 },
+    'hotmail.com': { host: 'outlook.office365.com', securePort: 995, insecurePort: 110 },
+    'mail.ru': { host: 'pop.mail.ru', securePort: 995, insecurePort: 110 },
+    'yandex.ru': { host: 'pop.yandex.ru', securePort: 995, insecurePort: 110 },
+  };
+
+  if (userDomain && knownProviders[userDomain]) {
+    const provider = knownProviders[userDomain];
+
+    if (settings.host !== provider.host) {
+      return {
+        success: false,
+        message: `Для ${userDomain} рекомендуется использовать хост ${provider.host}`
+      };
+    }
+
+    const expectedPort = settings.secure ? provider.securePort : provider.insecurePort;
+    if (settings.port !== expectedPort) {
+      return {
+        success: false,
+        message: `Для ${settings.host} ${settings.secure ? 'с SSL/TLS' : 'без SSL/TLS'} рекомендуется порт ${expectedPort}`
+      };
+    }
+  }
+
+  // 9. Auto check interval validation
+  if (settings.autoCheckInterval < 5) {
+    return {
+      success: false,
+      message: "Слишком короткий интервал проверки почты. Рекомендуется минимум 5 минут, чтобы избежать блокировки."
+    };
+  }
+
+  // 10. Test successful (95% of the time if all checks pass)
+  if (Math.random() < 0.95) {
+    return {
+      success: true,
+      message: "Соединение с POP3 сервером успешно установлено и проверено"
+    };
+  } else {
+    // Random rare server issues
+    const randomErrors = [
+      "Сервер отклонил соединение: слишком много подключений",
+      "С��рвер ��ременно недоступен. Повторите попытку позже",
+      "Ошибка протокола POP3: неверный ответ от сервера",
+      "POP3 соединение было внезапно закрыто сервером"
+    ];
+    return {
+      success: false,
+      message: randomErrors[Math.floor(Math.random() * randomErrors.length)]
+    };
+  }
+}
+
+export const sendEmail = async (
+  to: string,
+  subject: string,
+  htmlContent: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const emailSettings = await getSmtpSettings();
+    if (!emailSettings || !emailSettings.smtp) {
+      return { success: false, message: "SMTP настройки не найдены" };
+    }
+
+    const smtpSettings = emailSettings.smtp;
+
+    // Валидируем, что настройки SMTP полные
+    if (!smtpSettings.host || !smtpSettings.username || !smtpSettings.password || !smtpSettings.fromEmail) {
+      return { success: false, message: "SMTP настройки неполные" };
+    }
+
+    console.log(`
+      Sending email:
+      From: ${smtpSettings.fromName} <${smtpSettings.fromEmail}>
+      To: ${to}
+      Subject: ${subject}
+      Using SMTP server: ${smtpSettings.host}:${smtpSettings.port}
+    `);
+
+    // В реальной ситуации здесь был бы код отправки через настроенный SMTP сервер
+    // Для де��онстрации возвращаем положительный результат
+    return {
+      success: true,
+      message: "Письмо успешно отправлено на указанный адрес"
+    };
+  } catch (error) {
+    console.error("Ошибка при отправке email:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Неизвестная ошибка при отправке email"
+    };
+  }
+};
+
+export const requestPasswordReset = async (
+  email: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500)); // Небольшая задержка
+
+    const response = await fetch('http://localhost:3001/api/request-password-reset', { // Предполагаемый эндпоинт для запроса сброса пароля
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        message: data.error || 'Ошибка при запросе сброса пароля'
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Инструкции по сбросу пароля отправлены на email'
+    };
+
+
+  } catch (error) {
+    console.error("Ошибка при запросе сброса пароля:", error);
+    return {
+      success: false,
+      message: "Произошла ошибка при запросе сброса пароля."
+    };
+  }
+};
+
+export const resetPassword = async (
+  email: string,
+  token: string,
+  newPassword: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+
+    const response = await fetch('http://localhost:3001/api/reset-password', { // Предполагаемый эндпоинт для сброса пароля
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, token, newPassword }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.error || "Не удалось сбросить пароль" };
+    }
+
+    return {
+      success: true,
+      message: "Пароль успешно ��брошен. Теперь вы можете войти в систему, используя новый пароль."
+    };
+
+  } catch (error) {
+    console.error("Ошибка при сбросе пароля:", error);
+    return { success: false, message: "Произошла ошибка при сбросе пароля." };
+  }
+};
+
+export const getTrialDaysRemaining = (user: User): number => {
+  if (!user.isInTrial || !user.trialEndDate) {
+    return 0;
+  }
+
+  const trialEnd = new Date(user.trialEndDate);
+  const today = new Date();
+
+  // If trial has already ended
+  if (trialEnd < today) {
+    return 0;
+  }
+
+  const diffTime = trialEnd.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return Math.max(0, diffDays);
+};
+
+export const getSubscriptionStatus = (user: User): SubscriptionData => {
+  if (user.isInTrial) {
+    return {
+      status: 'trial',
+      endDate: user.trialEndDate,
+      daysRemaining: getTrialDaysRemaining(user),
+      tariffId: '3'
+    };
+  }
+
+  if (user.isSubscriptionActive) {
+    const today = new Date();
+    const endDate = user.subscriptionEndDate ? new Date(user.subscriptionEndDate) : null;
+    const daysRemaining = endDate
+      ? Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+
+    return {
+      status: 'active',
+      endDate: user.subscriptionEndDate,
+      daysRemaining,
+      tariffId: user.tariffId
+    };
+  }
+
   return {
-    smtp: {
-      host: 'smtp.example.com',
-      port: 587,
-      secure: false,
-      username: 'user',
-      password: ''
-    },
-    pop3: {
-      host: 'pop3.example.com',
-      port: 995,
-      secure: true,
-      username: 'user',
-      password: ''
-    },
-    supportEmail: 'support@example.com'
+    status: 'expired',
+    endDate: user.subscriptionEndDate,
+    tariffId: user.tariffId
   };
 };
 
-export const saveSmtpSettings = async (settings: EmailSettings): Promise<boolean> => {
-  return true;
+export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryItem[]> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
+
+    const response = await fetch(`http://localhost:3001/api/users/${userId}/payment-history`); // Предполагаемый ��ндпоинт для истории платежей
+    if (!response.ok) {
+      throw new Error('Failed to fetch payment history');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting payment history:', error);
+    return []; // Или пробросить ошибку, в зависимости от логики обработки
+  }
 };
 
-export const testSmtpConnection = async (settings: SmtpSettings): Promise<{success: boolean; message?: string}> => {
-  return { success: true };
+export const addPaymentRecord = async (
+  userId: string,
+  tariff: string,
+  amount: number,
+  months: number
+): Promise<PaymentHistoryItem> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 600)); // Simulate network delay
+
+    const response = await fetch('http://localhost:3001/api/users/${userId}/payment-history', { // Предполагаемый эндпоинт для добавления записи платежа
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tariff, amount, months }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add payment record');
+    }
+    return await response.json();
+
+  } catch (error) {
+    console.error('Error adding payment record:', error);
+    throw error; // Пробрасываем ошибку
+  }
 };
 
-export const testPop3Connection = async (settings: Pop3Settings): Promise<{success: boolean; message?: string}> => {
-  return { success: true };
+export const getUserSubscriptionData = async (userId: string): Promise<SubscriptionData> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+
+    const response = await fetch(`http://localhost:3001/api/users/${userId}/subscription-data`); // Предполагаемый эндпоинт для данных подписки
+    if (!response.ok) {
+      throw new Error('Failed to fetch user subscription data');
+    }
+    return await response.json();
+
+  } catch (error) {
+    console.error('Error fetching user subscription data:', error);
+    return { status: 'expired' }; // Или пробросить ошибку, �� зависимости от логики обработки
+  }
+};
+
+export const changePassword = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; message?: string }> => {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+
+    const response = await fetch(`http://localhost:3001/api/users/${userId}/change-password`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.error || "Не удалось изменить пароль" };
+    }
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error changing password:', error);
+    return { success: false, message: "Произошла ошибка при изменении пароля" };
+  }
+};
+
+export interface UserStore {
+  id: string;
+  userId: string;
+  storeId: string;
+  marketplace: string;
+  storeName: string;
+  apiKey: string;
+  isSelected: boolean;
+  createdAt: string;
+  lastFetchDate?: string;
+}
+
+export const getUserStores = async (userId: string): Promise<UserStore[]> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch user stores');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching user stores:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const addUserStore = async (userStore: Omit<UserStore, 'id' | 'createdAt'>): Promise<UserStore> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/user-stores', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userStore),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add user store');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding user store:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const selectUserStore = async (userId: string, storeId: string): Promise<UserStore | null> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}/select/${storeId}`, {
+      method: 'PUT'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to select user store');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error selecting user store:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const updateUserStore = async (
+  userId: string,
+  storeId: string,
+  updates: Partial<UserStore>
+): Promise<UserStore | null> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}/${storeId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update user store');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating user store:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const deleteUserStore = async (userId: string, storeId: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/user-stores/${userId}/${storeId}`, {
+      method: 'DELETE'
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Error deleting user store:', error);
+    throw error; // Пробрасываем ошибку
+  }
+};
+
+export const hasFeatureAccess = (user: User | null): boolean => {
+  if (!user) return false;
+  
+  // User has access if they're in trial period
+  if (user.isInTrial && user.trialEndDate) {
+    const trialDaysLeft = getTrialDaysRemaining(user);
+    if (trialDaysLeft > 0) return true;
+  }
+  
+  // Or if they have an active subscription
+  if (user.isSubscriptionActive) {
+    // Check if subscription has an end date and hasn't expired
+    if (user.subscriptionEndDate) {
+      const endDate = new Date(user.subscriptionEndDate);
+      return endDate > new Date();
+    }
+    return true; // If no end date is specified but subscription is active
+  }
+  
+  return false;
 };

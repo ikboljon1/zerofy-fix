@@ -8,6 +8,10 @@ schemas = ["public", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
+[api.cors]
+enabled = true
+origin = "*"
+
 [db]
 port = 54322
 shadow_port = 54320

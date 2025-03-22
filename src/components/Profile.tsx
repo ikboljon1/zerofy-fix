@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -53,7 +54,7 @@ import {
   addPaymentRecord,
   getPaymentHistory,
 } from "@/services/userService";
-import { initialTariffs } from "@/data/tariffs";
+import { initialTariffs } from "@/data/tariffs";  // Import directly from the correct source
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -365,7 +366,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       if (!userProfile) {
-        throw new Error("Пользоват��ль не найден");
+        throw new Error("Пользователь не найден");
       }
       
       const selectedPlanObject = subscriptionPlans.find(plan => plan.name === selectedPlan);
@@ -649,7 +650,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
             <div className="flex items-center gap-2 mt-2">
               <span>Осталось дней:</span>
               <Badge variant="outline" className="bg-amber-500/20 border-amber-500/30">
-                {userProfile?.trialEndsAt ? Math.max(0, Math.ceil((new Date(userProfile.trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}
+                {userProfile?.trialEndDate ? Math.max(0, Math.ceil((new Date(userProfile.trialEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}
               </Badge>
             </div>
           </AlertDescription>
@@ -768,7 +769,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
                     <span className="text-sm text-muted-foreground">Дата окончания</span>
                     <span className="font-medium">
                       {userProfile?.isInTrial 
-                        ? (userProfile.trialEndsAt ? formatDate(userProfile.trialEndsAt) : 'N/A')
+                        ? (userProfile.trialEndDate ? formatDate(userProfile.trialEndDate) : 'N/A')
                         : formatDate(currentSubscription.endDate)
                       }
                     </span>
@@ -779,7 +780,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
                     <span className="text-sm text-muted-foreground">Осталось дней</span>
                     <Badge variant="outline" className="font-medium mt-1">
                       {userProfile?.isInTrial 
-                        ? (userProfile.trialEndsAt ? Math.max(0, Math.ceil((new Date(userProfile.trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0)
+                        ? (userProfile.trialEndDate ? Math.max(0, Math.ceil((new Date(userProfile.trialEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0)
                         : currentSubscription.daysRemaining
                       }
                     </Badge>
@@ -1015,7 +1016,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
                       <span className="text-muted-foreground">Дата окончания:</span>
                       <span className="font-medium">
                         {userProfile?.isInTrial 
-                          ? (userProfile.trialEndsAt ? formatDate(userProfile.trialEndsAt) : 'N/A')
+                          ? (userProfile.trialEndDate ? formatDate(userProfile.trialEndDate) : 'N/A')
                           : formatDate(currentSubscription.endDate)
                         }
                       </span>
@@ -1025,7 +1026,7 @@ const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
                         <span className="text-muted-foreground">Осталось дней:</span>
                         <Badge variant="outline">
                           {userProfile?.isInTrial 
-                            ? (userProfile.trialEndsAt ? Math.max(0, Math.ceil((new Date(userProfile.trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0)
+                            ? (userProfile.trialEndDate ? Math.max(0, Math.ceil((new Date(userProfile.trialEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0)
                             : currentSubscription.daysRemaining
                           }
                         </Badge>

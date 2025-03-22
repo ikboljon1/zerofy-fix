@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -47,7 +48,7 @@ const Index = () => {
     setUser(parsedUser);
     
     // Check if user has access (trial or active subscription)
-    const access = hasFeatureAccess(user, 'dashboard');
+    const access = hasFeatureAccess(parsedUser);
     setHasAccess(access);
     
     // Calculate trial days if in trial
@@ -85,7 +86,7 @@ const Index = () => {
   const handleUserUpdated = (updatedUser: User) => {
     setUser(updatedUser);
     // Re-check access with updated user data
-    setHasAccess(hasFeatureAccess(updatedUser, 'dashboard'));
+    setHasAccess(hasFeatureAccess(updatedUser));
     
     if (updatedUser.isInTrial) {
       setTrialDaysLeft(getTrialDaysRemaining(updatedUser));
@@ -99,7 +100,7 @@ const Index = () => {
   const renderContent = () => {
     // If user doesn't have access (trial expired and no subscription)
     if (!hasAccess) {
-      return <SubscriptionExpiredAlert user={user} />;
+      return <SubscriptionExpiredAlert user={user} onUserUpdated={handleUserUpdated} />;
     }
     
     const { profitable, unprofitable } = getProductsData();
