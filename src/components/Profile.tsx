@@ -1,1004 +1,1411 @@
-import React, { useState, useEffect } from "react";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import PasswordChangeForm from "./PasswordChangeForm";
-import { useNavigate } from "react-router-dom";
+import PasswordChangeForm from "@/components/PasswordChangeForm";
 import {
-  TARIFF_STORE_LIMITS,
-  getTrialDaysRemaining,
-  getSubscriptionStatus,
-  User,
+  CreditCard,
+  History,
+  User as UserIcon,
+  DollarSign,
+  Mail,
+  Phone,
+  Building,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Loader2,
+  AlertTriangle,
+  Clock,
+  Lock,
+  LogOut,
+  CreditCardIcon,
+  CalendarClock,
+  Star,
+  ShieldCheck,
+  Award,
+  ArrowRight,
+  ShieldAlert,
+  UserCog,
+  Check,
+  CalendarIcon,
+  ShoppingBag,
+  KeyRound,
+  BadgePercent,
+  Calendar
+} from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { 
+  TARIFF_STORE_LIMITS, 
+  getTrialDaysRemaining, 
+  getSubscriptionStatus, 
+  User as UserType,
   PaymentHistoryItem,
   activateSubscription,
   SubscriptionData,
   addPaymentRecord,
-  getPaymentHistory
+  getPaymentHistory,
 } from "@/services/userService";
-import { Loader2, CheckCircle, AlertCircle, CreditCard, UserCircle, Lock, Building, Phone, Mail, FileText, ShieldCheck, Shield, LogOut, Check, Terminal, ShieldAlert } from "lucide-react";
+import { initialTariffs } from "@/data/tariffs";  // Import directly from the correct source
+import { useNavigate } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
-const Profile = () => {
-  const [userData, setUserData] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    company: ""
-  });
-  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [selectedTariff, setSelectedTariff] = useState<string>("basic");
-  const [paymentMethod, setPaymentMethod] = useState<string>("card");
-  const [isAgreementAccepted, setIsAgreementAccepted] = useState(false);
+interface SavedCard {
+  cardNumber: string;
+  expiryDate: string;
+  cvv: string;
+  lastFour: string;
+}
+
+interface ProfileProps {
+  user: UserType | null;
+  onUserUpdated?: (user: UserType) => void;
+}
+
+const Profile = ({ user: propUser, onUserUpdated }: ProfileProps) => {
+  const [activeTab, setActiveTab] = useState("profile");
+  const [selectedPlan, setSelectedPlan] = useState("");
+  const [isAddingCard, setIsAddingCard] = useState(false);
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentSubscription, setCurrentSubscription] = useState<{
+    plan: string;
+    endDate: string;
+    daysRemaining: number;
+    isActive: boolean;
+  } | null>(null);
+  const [isSubscriptionExpired, setIsSubscriptionExpired] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserType | null>(null);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
-  const [isLoadingPaymentHistory, setIsLoadingPaymentHistory] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("account");
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [selectedMonths, setSelectedMonths] = useState(1);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [selectedTariff, setSelectedTariff] = useState<string>("2");
+  const [subscriptionMonths, setSubscriptionMonths] = useState(1);
+  const [isActivating, setIsActivating] = useState(false);
+  const isMobile = useIsMobile();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userJson = localStorage.getItem('user') || sessionStorage.getItem('user');
-    if (userJson) {
-      try {
-        const user = JSON.parse(userJson);
-        setUserData(user);
-        setEditedData({
-          name: user.name || "",
-          email: user.email || "",
-          phone: user.phone || "",
-          company: user.company || ""
-        });
-
-        if (user.id) {
-          loadSubscriptionData(user.id);
-          loadPaymentHistory(user.id);
-        }
-      } catch (error) {
-        console.error('Ошибка при парсинге данных пользователя:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      navigate('/');
-    }
-  }, [navigate]);
-
-  const loadSubscriptionData = async (userId: string) => {
-    try {
-      const data = await getSubscriptionStatus(userId);
-      setSubscriptionData(data);
-    } catch (error) {
-      console.error('Ошибка при загрузке данных подписки:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить информацию о подписке",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadPaymentHistory = async (userId: string) => {
-    setIsLoadingPaymentHistory(true);
-    try {
-      const history = await getPaymentHistory(userId);
-      setPaymentHistory(history);
-    } catch (error) {
-      console.error('Ошибка при загрузке истории платежей:', error);
-    } finally {
-      setIsLoadingPaymentHistory(false);
-    }
-  };
-
-  const handleEditToggle = () => {
-    if (isEditing) {
-      if (userData) {
-        setEditedData({
-          name: userData.name || "",
-          email: userData.email || "",
-          phone: userData.phone || "",
-          company: userData.company || ""
-        });
-      }
-    }
-    setIsEditing(!isEditing);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditedData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSaveProfile = async () => {
-    if (!userData) return;
-
-    setIsSaving(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const updatedUser = {
-        ...userData,
-        name: editedData.name,
-        email: editedData.email,
-        phone: editedData.phone,
-        company: editedData.company
+    if (propUser) {
+      setUserProfile(propUser);
+      
+      const mockSubscriptionData = {
+        plan: propUser.tariffId === "3" ? "Премиум" : 
+              propUser.tariffId === "2" ? "Бизнес" : 
+              propUser.tariffId === "4" ? "Корпоративный" : "Стартовый",
+        endDate: propUser.subscriptionEndDate || "2024-12-31T23:59:59Z",
+        daysRemaining: 30,
+        isActive: propUser.isSubscriptionActive || propUser.isInTrial || false
       };
-
-      if (localStorage.getItem('user')) {
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-      } else if (sessionStorage.getItem('user')) {
-        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      setCurrentSubscription(mockSubscriptionData);
+      setIsSubscriptionExpired(!mockSubscriptionData.isActive);
+      
+      setIsLoadingHistory(true);
+      getPaymentHistory(propUser.id).then((history) => {
+        setPaymentHistory(history);
+        setIsLoadingHistory(false);
+      });
+    } else {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        setUserProfile(user);
+        
+        const mockSubscriptionData = {
+          plan: user.tariffId === "3" ? "Премиум" : 
+                user.tariffId === "2" ? "Бизнес" : 
+                user.tariffId === "4" ? "Корпоративный" : "Стартовый",
+          endDate: user.subscriptionEndDate || "2024-12-31T23:59:59Z",
+          daysRemaining: 30,
+          isActive: user.isSubscriptionActive || user.isInTrial || false
+        };
+        
+        setCurrentSubscription(mockSubscriptionData);
+        setIsSubscriptionExpired(!mockSubscriptionData.isActive);
+        
+        setIsLoadingHistory(true);
+        getPaymentHistory(user.id).then((history) => {
+          setPaymentHistory(history);
+          setIsLoadingHistory(false);
+        });
       }
-
-      setUserData(updatedUser);
-      setIsEditing(false);
-
-      toast({
-        title: "Успешно",
-        description: "Профиль успешно обновлен",
-      });
-    } catch (error) {
-      console.error('Ошибка при сохранении профиля:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось обновить профиль",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
     }
+    
+    const storedCard = localStorage.getItem('savedCard');
+    if (storedCard) {
+      setSavedCard(JSON.parse(storedCard));
+    }
+  }, [propUser]);
+
+  useEffect(() => {
+    if (userProfile) {
+      setSubscriptionData(getSubscriptionStatus(userProfile));
+    }
+  }, [userProfile]);
+
+  const userData = userProfile || {
+    name: "Иван Иванов",
+    email: "ivan@example.com",
+    phone: "+7 (999) 123-45-67",
+    company: "ООО Компания",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ivan"
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
-    navigate('/');
-    
+  const subscriptionPlans = [
+    {
+      id: "1",
+      name: "Стартовый",
+      price: "2000 ₽/мес",
+      priceValue: 2000,
+      color: "bg-blue-600",
+      features: ["1 магазин", "Базовая аналитика", "Email поддержка"],
+      icon: ShoppingBag
+    },
+    {
+      id: "2",
+      name: "Бизнес",
+      price: "5000 ₽/мес",
+      priceValue: 5000,
+      color: "bg-purple-600",
+      features: [
+        "До 3 магазинов",
+        "Расширенная аналитика",
+        "Приоритетная поддержка",
+        "API доступ",
+      ],
+      icon: Star
+    },
+    {
+      id: "3",
+      name: "Премиум",
+      price: "10000 ₽/мес",
+      priceValue: 10000,
+      color: "bg-amber-500",
+      features: [
+        "До 10 магазинов",
+        "Полная аналитика",
+        "24/7 поддержка",
+        "API доступ",
+        "Персональный менеджер",
+      ],
+      icon: Award
+    },
+    {
+      id: "4",
+      name: "Корпоративный",
+      price: "30000 ₽/мес",
+      priceValue: 30000,
+      color: "bg-emerald-600",
+      features: [
+        "Неограниченное количество магазинов",
+        "Корпоративные отчеты",
+        "Выделенная линия поддержки",
+        "Полный API доступ",
+        "Команда персональных менеджеров",
+        "Интеграция с корпоративными системами"
+      ],
+      icon: ShieldCheck
+    }
+  ];
+
+  const handleSelectPlan = (planName: string) => {
+    setSelectedPlan(planName);
     toast({
-      title: "Выход выполнен",
-      description: "Вы успешно вышли из системы",
+      title: "Подписка выбрана",
+      description: `Вы выбрали тариф ${planName}`,
     });
   };
 
-  const handleTariffSelection = (tariffId: string) => {
-    setSelectedTariff(tariffId);
-    setShowPaymentDialog(true);
-  };
-
-  const handlePaymentMethodChange = (method: string) => {
-    setPaymentMethod(method);
-  };
-
-  const handleProcessPayment = async () => {
-    if (!userData || !selectedTariff) return;
-
-    setIsProcessingPayment(true);
-    try {
-      let amount = 0;
-      switch (selectedTariff) {
-        case "basic":
-          amount = 990;
-          break;
-        case "pro":
-          amount = 1990;
-          break;
-        case "unlimited":
-          amount = 5990;
-          break;
-        default:
-          amount = 0;
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const success = await activateSubscription(userData.id, selectedTariff);
-      if (success) {
-        await addPaymentRecord(userData.id, amount, selectedTariff, paymentMethod);
-
-        const updatedUser = {
-          ...userData,
-          isSubscriptionActive: true,
-          tariffId: selectedTariff,
-          subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        };
-
-        if (localStorage.getItem('user')) {
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        } else if (sessionStorage.getItem('user')) {
-          sessionStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-
-        setUserData(updatedUser);
-        loadSubscriptionData(userData.id);
-        loadPaymentHistory(userData.id);
-
-        toast({
-          title: "Платеж обработан",
-          description: "Подписка успешно активирована",
-        });
-
-        setShowPaymentDialog(false);
-      } else {
-        throw new Error("Ошибка активации подписки");
-      }
-    } catch (error) {
-      console.error('Ошибка при обработке платежа:', error);
+  const handleProceedToPayment = () => {
+    if (!selectedPlan) {
       toast({
-        title: "Ошибка",
-        description: "Не удалось обработать платеж",
+        title: "Выберите тариф",
+        description: "Пожалуйста, выберите тариф для продолжения",
         variant: "destructive",
       });
-    } finally {
-      setIsProcessingPayment(false);
+      return;
+    }
+    setActiveTab("payment");
+  };
+
+  const formatCardNumber = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+    return formatted.substring(0, 19);
+  };
+
+  const formatExpiryDate = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length > 2) {
+      return `${digits.substring(0, 2)}/${digits.substring(2, 4)}`;
+    }
+    return digits;
+  };
+
+  const getLastFourDigits = (cardNum: string): string => {
+    const digits = cardNum.replace(/\D/g, '');
+    return digits.slice(-4);
+  };
+
+  const handleAddCard = async () => {
+    if (isAddingCard) {
+      if (!cardNumber || !expiryDate || !cvv) {
+        toast({
+          title: "Ошибка",
+          description: "Пожалуйста, заполните все поля карты",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const cardDigits = cardNumber.replace(/\s/g, '');
+      if (cardDigits.length !== 16 || !/^\d+$/.test(cardDigits)) {
+        toast({
+          title: "Ошибка",
+          description: "Пожалуйста, введите корректный номер карты (16 цифр)",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!/^\d{2}\/\d{2}$/.test(expiryDate)) {
+        toast({
+          title: "Ошибка",
+          description: "Пожалуйста, введите дату в формате ММ/ГГ",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (cvv.length !== 3 || !/^\d+$/.test(cvv)) {
+        toast({
+          title: "Ошибка",
+          description: "CVV должен состоять из 3 цифр",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsProcessing(true);
+      
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        const newCard: SavedCard = {
+          cardNumber: cardNumber.replace(/\s/g, ''),
+          expiryDate,
+          cvv,
+          lastFour: getLastFourDigits(cardNumber)
+        };
+        
+        localStorage.setItem('savedCard', JSON.stringify(newCard));
+        setSavedCard(newCard);
+        
+        toast({
+          title: "Карта добавлена",
+          description: "Ваша карта успешно добавлена",
+        });
+        
+        setIsAddingCard(false);
+        setCardNumber("");
+        setExpiryDate("");
+        setCvv("");
+      } catch (error) {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось добавить карту",
+          variant: "destructive",
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      setIsAddingCard(true);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-10 flex justify-center items-center h-[80vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
+  const handleDeleteCard = () => {
+    localStorage.removeItem('savedCard');
+    setSavedCard(null);
+    toast({
+      title: "Карта удалена",
+      description: "Ваша карта успешно удалена",
+    });
+  };
 
-  if (!userData) {
-    return (
-      <div className="container mx-auto py-10">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Ошибка доступа</AlertTitle>
-          <AlertDescription>
-            Не удалось загрузить данные пользователя. Пожалуйста, войдите в систему.
-          </AlertDescription>
-        </Alert>
-        <div className="mt-4 flex justify-center">
-          <Button onClick={() => navigate('/')}>Вернуться на главную</Button>
-        </div>
-      </div>
-    );
-  }
+  const handlePayment = async () => {
+    if (!selectedPlan) {
+      toast({
+        title: "Выберите тариф",
+        description: "Пожалуйста, выберите тариф для продолжения",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const renderSubscriptionStatus = () => {
-    if (userData.isSubscriptionActive) {
-      return (
-        <Badge variant="default" className="ml-2 bg-green-600">
-          <CheckCircle className="h-3 w-3 mr-1" />
-          Активна
-        </Badge>
-      );
-    } else if (userData.isInTrial) {
-      const daysRemaining = userData.trialEndsAt ? Math.max(0, Math.ceil((new Date(userData.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
-      if (daysRemaining <= 0) {
-        return (
-          <Badge variant="outline" className="ml-2 border-yellow-500 text-yellow-600">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Пробный период истек
-          </Badge>
-        );
-      } else {
-        return (
-          <Badge variant="outline" className="ml-2 border-yellow-500 text-yellow-600">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Пробный период ({daysRemaining} дн.)
-          </Badge>
-        );
+    setIsProcessing(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      if (!userProfile) {
+        throw new Error("Пользователь не найден");
       }
-    } else {
-      return (
-        <Badge variant="destructive" className="ml-2">
-          <AlertCircle className="h-3 w-3 mr-1" />
-          Неактивна
-        </Badge>
+      
+      const selectedPlanObject = subscriptionPlans.find(plan => plan.name === selectedPlan);
+      
+      if (!selectedPlanObject) {
+        throw new Error("Тариф не найден");
+      }
+      
+      const result = await activateSubscription(
+        userProfile.id, 
+        selectedPlanObject.id, 
+        selectedMonths
       );
+      
+      if (result.success && result.user) {
+        await addPaymentRecord(
+          userProfile.id,
+          selectedPlanObject.id,
+          calculateTotalPrice(selectedPlanObject.id),
+          selectedMonths
+        );
+        
+        setUserProfile(result.user);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        
+        if (onUserUpdated && result.user) {
+          onUserUpdated(result.user);
+        }
+        
+        if (result.user.subscriptionEndDate) {
+          const endDate = new Date(result.user.subscriptionEndDate);
+          const today = new Date();
+          const diffTime = endDate.getTime() - today.getTime();
+          const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          setCurrentSubscription({
+            plan: selectedPlan,
+            endDate: result.user.subscriptionEndDate,
+            daysRemaining: Math.max(0, daysRemaining),
+            isActive: true
+          });
+        }
+        
+        setIsSubscriptionExpired(false);
+        
+        const history = await getPaymentHistory(userProfile.id);
+        setPaymentHistory(history);
+      }
+      
+      toast({
+        title: "Успешно",
+        description: `Подписка ${selectedPlan} успешно оформлена на ${selectedMonths} ${
+          selectedMonths === 1 ? 'месяц' : selectedMonths <= 4 ? 'месяца' : 'месяцев'
+        }`,
+      });
+      
+      setActiveTab("subscription");
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось выполнить платеж",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const calculateTotalPrice = (planId: string): number => {
+    const plan = subscriptionPlans.find(p => p.id === planId);
+    if (!plan) return 0;
+    
+    let price = plan.priceValue * selectedMonths;
+    
+    if (discountPercentage > 0) {
+      price = price * (1 - discountPercentage / 100);
+    }
+    
+    return Math.round(price);
+  };
+
+  const handleMonthsChange = (months: number) => {
+    setSelectedMonths(months);
+    
+    if (months === 3) {
+      setDiscountPercentage(10); // 10% discount for 3 months
+    } else if (months === 6) {
+      setDiscountPercentage(15); // 15% discount for 6 months
+    } else if (months === 12) {
+      setDiscountPercentage(25); // 25% discount for 12 months
+    } else {
+      setDiscountPercentage(0); // No discount for 1 month
     }
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "Не указано";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('ru-RU', {
+      return new Intl.DateTimeFormat('ru-RU', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
+      }).format(date);
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return 'Н/Д';
+    }
+  };
+
+  const getSubscriptionProgress = (): number => {
+    if (!currentSubscription) return 0;
+    if (!currentSubscription.isActive) return 100;
+    
+    const daysInMonth = 30;
+    const daysElapsed = daysInMonth - currentSubscription.daysRemaining;
+    return Math.min(100, Math.max(0, (daysElapsed / daysInMonth) * 100));
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    toast({
+      title: "Вы вышли из системы",
+      description: "Перенаправление на страницу входа...",
+    });
+    
+    setTimeout(() => {
+      navigate('/');
+    }, 1000);
+  };
+
+  const SubscriptionExpiredAlert = () => {
+    if (!isSubscriptionExpired) return null;
+    
+    return (
+      <Alert variant="destructive" className="mb-6">
+        <Lock className="h-5 w-5" />
+        <AlertDescription>
+          <div className="font-bold text-lg">Ваша подписка истекла!</div>
+          <p>Доступ к функциям системы ограничен. Пожалуйста, продлите подписку для восстановления полного доступа.</p>
+          <Button 
+            className="mt-2 w-full sm:w-auto" 
+            onClick={() => setActiveTab("subscription")}
+          >
+            Продлить подписку
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  };
+
+  const getStoreLimit = () => {
+    if (!userProfile || !userProfile.tariffId) return 1;
+    return userProfile.tariffId in TARIFF_STORE_LIMITS ? TARIFF_STORE_LIMITS[userProfile.tariffId] : 1;
+  };
+
+  const TariffCard = ({ plan, onClick, isSelected }: { 
+    plan: typeof subscriptionPlans[0], 
+    onClick: () => void, 
+    isSelected: boolean 
+  }) => {
+    const Icon = plan.icon;
+    return (
+      <Card 
+        className={`cursor-pointer transition-all hover:border-primary ${
+          isSelected ? 'border-2 border-primary shadow-md' : ''
+        }`}
+        onClick={onClick}
+      >
+        <div className={`h-2 ${plan.color}`}></div>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Icon className={`h-5 w-5 ${plan.color.replace('bg-', 'text-')}`} />
+              {plan.name}
+            </CardTitle>
+            {isSelected && (
+              <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
+                <Check className="h-3 w-3 mr-1" />
+                Выбрано
+              </Badge>
+            )}
+          </div>
+          <CardDescription>{plan.price}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            {plan.features.map((feature, index) => (
+              <li key={index} className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span className="text-sm">{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            variant={isSelected ? "default" : "outline"} 
+            className="w-full flex items-center justify-center gap-2"
+            onClick={onClick}
+          >
+            {isSelected ? (
+              <>
+                <Check className="h-4 w-4" />
+                Выбрано
+              </>
+            ) : (
+              <>
+                Выбрать план
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  const handleActivateSubscription = async () => {
+    if (!userProfile) return;
+    
+    setIsActivating(true);
+    try {
+      const result = await activateSubscription(
+        userProfile.id, 
+        selectedTariff, 
+        subscriptionMonths
+      );
+      
+      if (result.success && result.user) {
+        onUserUpdated?.(result.user);
+        setSubscriptionData(getSubscriptionStatus(result.user));
+        
+        toast({
+          title: "Подписка активирована",
+          description: `Подписка успешно активирована до ${result.user.subscriptionEndDate ? format(new Date(result.user.subscriptionEndDate), 'dd.MM.yyyy') : 'бессрочно'}`,
+        });
+      } else {
+        toast({
+          title: "Ошибка активации",
+          description: result.message || "Не удалось активировать подписку",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error activating subscription:", error);
+      toast({
+        title: "Ошибка",
+        description: "Произошла ошибка при активации подписки",
+        variant: "destructive",
       });
-    } catch (e) {
-      return "Неверный формат даты";
+    } finally {
+      setIsActivating(false);
     }
   };
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Профиль пользователя</h1>
-        <Button
-          variant="ghost"
-          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+    <div className="container mx-auto p-4 md:p-6 max-w-5xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Личный кабинет</h1>
+          <p className="text-muted-foreground">Управление вашим профилем и подпиской</p>
+        </div>
+        
+        <Button 
+          variant="destructive" 
+          className="flex items-center gap-2"
           onClick={handleLogout}
         >
-          <LogOut className="h-4 w-4 mr-2" />
-          Выйти
+          <LogOut className="h-4 w-4" />
+          Выйти из системы
         </Button>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="account">Аккаунт</TabsTrigger>
-          <TabsTrigger value="subscription">Подписка</TabsTrigger>
-          <TabsTrigger value="security">Безопасность</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="account">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserCircle className="h-5 w-5 text-blue-500" />
-                  <span>Основная информация</span>
-                </CardTitle>
-                <CardDescription>
-                  Управляйте своей личной информацией
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <div className="flex-shrink-0 flex flex-col items-center">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={userData.avatar} alt={userData.name || "Пользователь"} />
-                      <AvatarFallback>{(userData.name || "U").charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm text-muted-foreground mt-2">
-                      ID: {userData.id.substring(0, 8)}...
+      
+      {userProfile?.isInTrial && (
+        <Alert className="mb-6 bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-300">
+          <Star className="h-5 w-5" />
+          <AlertDescription className="flex flex-col">
+            <div className="font-bold text-lg">Пробный период</div>
+            <p>У вас активирован пробный период с тарифом "Премиум". Вы можете использовать все функции системы.</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span>Осталось дней:</span>
+              <Badge variant="outline" className="bg-amber-500/20 border-amber-500/30">
+                {userProfile?.trialEndDate ? Math.max(0, Math.ceil((new Date(userProfile.trialEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}
+              </Badge>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isSubscriptionExpired && !userProfile?.isInTrial && (
+        <Alert variant="destructive" className="mb-6">
+          <Lock className="h-5 w-5" />
+          <AlertDescription>
+            <div className="font-bold text-lg">Ваша подписка истекла!</div>
+            <p>Доступ к функциям системы ограничен. Пожалуйста, продлите подписку для восстановления полного доступа.</p>
+            <Button 
+              className="mt-2 w-full sm:w-auto" 
+              onClick={() => setActiveTab("subscription")}
+            >
+              Продлить подписку
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+        <Card className="lg:col-span-1">
+          <CardHeader className="text-center pb-2">
+            <div className="flex justify-center mb-4">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={userProfile?.avatar} alt={userProfile?.name} />
+                <AvatarFallback>{userProfile?.name?.charAt(0) || "U"}</AvatarFallback>
+              </Avatar>
+            </div>
+            <CardTitle className="text-xl">{userProfile?.name}</CardTitle>
+            <CardDescription className="flex items-center justify-center gap-1 mt-1">
+              <Mail className="h-3.5 w-3.5" />
+              {userProfile?.email}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Тариф:</span>
+                <Badge className={`${
+                  userProfile?.tariffId === "3" ? "bg-amber-500/90" : 
+                  userProfile?.tariffId === "2" ? "bg-purple-600/90" : 
+                  userProfile?.tariffId === "4" ? "bg-emerald-600/90" :
+                  "bg-blue-600/90"
+                }`}>
+                  {currentSubscription?.plan || "Стартовый"}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Магазины:</span>
+                <Badge variant="outline" className="flex items-center gap-1.5 bg-blue-950/30 text-blue-400 border-blue-800">
+                  <ShoppingBag className="h-3 w-3" />
+                  <span>{userProfile?.storeCount || 0}/{getStoreLimit()}</span>
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Статус:</span>
+                {userProfile?.isInTrial ? (
+                  <Badge className="bg-amber-500">Пробный</Badge>
+                ) : isSubscriptionExpired ? (
+                  <Badge variant="destructive">Истекла</Badge>
+                ) : (
+                  <Badge className="bg-green-600">Активна</Badge>
+                )}
+              </div>
+              <Separator className="my-2" />
+              <Button 
+                onClick={() => setActiveTab("profile")}
+                variant="outline" 
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <UserCog className="h-4 w-4" />
+                Редактировать профиль
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Информация о подписке</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {currentSubscription && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg">Тарифный план:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold">{currentSubscription.plan}</span>
+                    {userProfile?.isInTrial ? (
+                      <Badge className="bg-amber-500">Пробный</Badge>
+                    ) : currentSubscription.isActive ? (
+                      <Badge className="bg-green-600">Активна</Badge>
+                    ) : (
+                      <Badge variant="destructive">Истекла</Badge>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>Прогресс подписки</span>
+                    <span>{Math.round(getSubscriptionProgress())}%</span>
+                  </div>
+                  <Progress 
+                    value={getSubscriptionProgress()} 
+                    className={!currentSubscription.isActive && !userProfile?.isInTrial ? "h-2 bg-red-950" : "h-2"} 
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                  <div className="bg-card rounded-lg p-4 border flex flex-col items-center justify-center space-y-1 text-center">
+                    <CalendarIcon className="h-5 w-5 text-muted-foreground mb-1" />
+                    <span className="text-sm text-muted-foreground">Дата окончания</span>
+                    <span className="font-medium">
+                      {userProfile?.isInTrial 
+                        ? (userProfile.trialEndDate ? formatDate(userProfile.trialEndDate) : 'N/A')
+                        : formatDate(currentSubscription.endDate)
+                      }
                     </span>
                   </div>
-                  <div className="flex-grow">
-                    <div className="space-y-1 mb-4">
-                      <h3 className="text-xl font-semibold">{userData.name || "Пользователь"}</h3>
-                      <p className="text-muted-foreground">{userData.email}</p>
-                      <div className="flex items-center mt-1">
-                        <Badge variant={userData.role === 'admin' ? "default" : "outline"}>
-                          {userData.role === 'admin' ? (
-                            <>
-                              <ShieldAlert className="h-3 w-3 mr-1" />
-                              Администратор
-                            </>
-                          ) : (
-                            <>
-                              <UserCircle className="h-3 w-3 mr-1" />
-                              Пользователь
-                            </>
-                          )}
-                        </Badge>
-                        {renderSubscriptionStatus()}
-                      </div>
-                    </div>
-                    
-                    <div className="text-sm space-y-2">
-                      <div className="flex items-center">
-                        <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>Email: {userData.email}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>Телефон: {userData.phone || "Не указан"}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Building className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>Компания: {userData.company || "Не указана"}</span>
-                      </div>
-                    </div>
+                  
+                  <div className="bg-card rounded-lg p-4 border flex flex-col items-center justify-center space-y-1 text-center">
+                    <Clock className="h-5 w-5 text-muted-foreground mb-1" />
+                    <span className="text-sm text-muted-foreground">Осталось дней</span>
+                    <Badge variant="outline" className="font-medium mt-1">
+                      {userProfile?.isInTrial 
+                        ? (userProfile.trialEndDate ? Math.max(0, Math.ceil((new Date(userProfile.trialEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0)
+                        : currentSubscription.daysRemaining
+                      }
+                    </Badge>
+                  </div>
+                  
+                  <div className="bg-card rounded-lg p-4 border flex flex-col items-center justify-center space-y-1 text-center">
+                    <ShoppingBag className="h-5 w-5 text-muted-foreground mb-1" />
+                    <span className="text-sm text-muted-foreground">Лимит магазинов</span>
+                    <Badge variant="outline" className="font-medium mt-1">
+                      {getStoreLimit()}
+                    </Badge>
                   </div>
                 </div>
-
-                <Separator className="my-4" />
-
-                {isEditing ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">ФИО</Label>
-                        <Input
-                          id="name"
-                          name="name"
-                          value={editedData.name}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          value={editedData.email}
-                          onChange={handleInputChange}
-                          disabled
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Телефон</Label>
-                        <Input
-                          id="phone"
-                          name="phone"
-                          value={editedData.phone}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="company">Компания</Label>
-                        <Input
-                          id="company"
-                          name="company"
-                          value={editedData.company}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-sm text-center text-muted-foreground">
-                      Нажмите кнопку редактирования, чтобы изменить свои данные.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                {isEditing ? (
-                  <>
-                    <Button variant="outline" onClick={handleEditToggle} disabled={isSaving}>
-                      Отмена
-                    </Button>
-                    <Button onClick={handleSaveProfile} disabled={isSaving}>
-                      {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Сохранить
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" onClick={handleEditToggle} className="ml-auto">
-                    Ре��актировать
+                
+                <div className="flex flex-col md:flex-row gap-2 mt-4">
+                  <Button 
+                    className="flex items-center gap-2"
+                    onClick={() => setActiveTab("subscription")}
+                  >
+                    <Star className="h-4 w-4" />
+                    {currentSubscription.isActive || userProfile?.isInTrial ? "Изменить тариф" : "Активировать подписку"}
                   </Button>
-                )}
-              </CardFooter>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-blue-500" />
-                  <span>Статистика</span>
-                </CardTitle>
-                <CardDescription>
-                  Информация о вашей активности в системе
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Дата регистрации:</span>
-                    <span className="font-medium">{userData.registeredAt ? formatDate(userData.registeredAt) : "Не указано"}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Последний вход:</span>
-                    <span className="font-medium">{userData.lastLogin ? formatDate(userData.lastLogin) : "Не указано"}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Статус:</span>
-                    <Badge variant={userData.status === "active" ? "outline" : "destructive"} className={userData.status === "active" ? "border-green-500 text-green-600" : ""}>
-                      {userData.status === "active" ? "Активен" : "Неактивен"}
-                    </Badge>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Подключено магазинов:</span>
-                    <div className="flex items-center">
-                      <span className="font-medium">{userData.storeCount || 0}</span>
-                      {userData.tariffId && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (лимит: {TARIFF_STORE_LIMITS[userData.tariffId as keyof typeof TARIFF_STORE_LIMITS] || "∞"})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Тип подписки:</span>
-                    <Badge className="bg-blue-500">
-                      {userData.tariffId 
-                        ? userData.tariffId.charAt(0).toUpperCase() + userData.tariffId.slice(1) 
-                        : "Бесплатная"}
-                    </Badge>
-                  </div>
-                  {userData.isInTrial && userData.trialEndsAt && (
-                    <>
-                      <Separator />
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Пробный период до:</span>
-                        <span className="font-medium">{formatDate(userData.trialEndsAt)}</span>
-                      </div>
-                    </>
-                  )}
-                  {userData.isSubscriptionActive && userData.subscriptionEndDate && (
-                    <>
-                      <Separator />
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Подписка активна до:</span>
-                        <span className="font-medium">{formatDate(userData.subscriptionEndDate)}</span>
-                      </div>
-                    </>
-                  )}
+                  <Button 
+                    className="flex items-center gap-2"
+                    variant="outline"
+                    onClick={() => setActiveTab("payment")}
+                  >
+                    <CreditCardIcon className="h-4 w-4" />
+                    Управление платежами
+                  </Button>
+                  <Button 
+                    className="flex items-center gap-2"
+                    variant="outline"
+                    onClick={() => setActiveTab("history")}
+                  >
+                    <History className="h-4 w-4" />
+                    История платежей
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4 w-full">
+          <TabsTrigger value="profile" className="flex items-center gap-2">
+            <UserIcon className="h-4 w-4" />
+            <span className={isMobile ? 'text-sm' : ''}>Профиль</span>
+          </TabsTrigger>
+          <TabsTrigger value="password" className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4" />
+            <span className={isMobile ? 'text-sm' : ''}>Пароль</span>
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            <span className={isMobile ? 'text-sm' : ''}>Подписка</span>
+          </TabsTrigger>
+          <TabsTrigger value="payment" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            <span className={isMobile ? 'text-sm' : ''}>Оплата</span>
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <span className={isMobile ? 'text-sm' : ''}>История</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="profile">
+          <Card>
+            <CardHeader>
+              <CardTitle>Личные данные</CardTitle>
+              <CardDescription>
+                Обновите информацию о себе и вашей компании
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">ФИО</Label>
+                  <div className="relative">
+                    <Input
+                      id="name"
+                      defaultValue={userProfile?.name}
+                      className="pl-10"
+                    />
+                    <UserIcon className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Input
+                      id="email"
+                      type="email"
+                      defaultValue={userProfile?.email}
+                      className="pl-10"
+                    />
+                    <Mail className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Телефон</Label>
+                  <div className="relative">
+                    <Input
+                      id="phone"
+                      defaultValue={userProfile?.phone || ''}
+                      className="pl-10"
+                    />
+                    <Phone className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Компания</Label>
+                  <div className="relative">
+                    <Input
+                      id="company"
+                      defaultValue={userProfile?.company || ''}
+                      className="pl-10"
+                    />
+                    <Building className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-6">
+                <Button 
+                  className="w-full md:w-auto" 
+                  disabled={isSubscriptionExpired && !userProfile?.isInTrial}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Сохранить изменения
+                  {isSubscriptionExpired && !userProfile?.isInTrial && (
+                    <Lock className="ml-2 h-4 w-4" />
+                  )}
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full md:w-auto ml-2 hidden md:flex"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Выйти из системы
+                </Button>
+              </div>
+              
+              {isSubscriptionExpired && !userProfile?.isInTrial && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Редактирование профиля недоступно. Пожалуйста, продлите подписку.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="password">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-blue-500" />
+                Смена пароля
+              </CardTitle>
+              <CardDescription>
+                Обновите пароль для входа в личный кабинет
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userProfile ? (
+                <PasswordChangeForm userId={userProfile.id} />
+              ) : (
+                <div className="flex justify-center items-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              )}
+              
+              {isSubscriptionExpired && !userProfile?.isInTrial && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Изменение пароля недоступно. Пожалуйста, продлите подписку.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="subscription">
-          <div className="grid gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-blue-500" />
-                  <span>Управление подпиской</span>
-                </CardTitle>
-                <CardDescription>
-                  Просмотр и изменение тарифного плана
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">Текущий тарифный план</h3>
-                  <div className="flex items-center mb-4">
-                    <Badge className="bg-blue-500 mr-2">
-                      {userData.tariffId 
-                        ? userData.tariffId.charAt(0).toUpperCase() + userData.tariffId.slice(1) 
-                        : "Бесплатный"}
-                    </Badge>
-                    {renderSubscriptionStatus()}
+          <div className="space-y-6">
+            {currentSubscription && (
+              <Card className="mb-6 overflow-hidden">
+                <div className={`h-2 ${
+                  userProfile?.tariffId === "3" ? "bg-amber-500" : 
+                  userProfile?.tariffId === "2" ? "bg-purple-600" : 
+                  userProfile?.tariffId === "4" ? "bg-emerald-600" :
+                  "bg-blue-600"
+                }`}></div>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Ваша текущая подписка</span>
+                    {userProfile?.isInTrial ? (
+                      <Badge className="bg-amber-500">Пробный период</Badge>
+                    ) : currentSubscription.isActive ? (
+                      <Badge className="bg-green-600">Активна</Badge>
+                    ) : (
+                      <Badge variant="destructive">Истекла</Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Тарифный план:</span>
+                    <span className="text-lg font-bold">{currentSubscription.plan}</span>
                   </div>
-
-                  {userData.isInTrial && userData.trialEndsAt && (
-                    <Alert className="mb-4 bg-yellow-50 border-yellow-200">
-                      <AlertCircle className="h-4 w-4 text-yellow-600" />
-                      <AlertTitle className="text-yellow-700">Пробный период активен</AlertTitle>
-                      <AlertDescription className="text-yellow-600">
-                        Ваш пробный период истекает {formatDate(userData.trialEndsAt)}. Выберите тариф для продолжения использования всех функций.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {!userData.isSubscriptionActive && !userData.isInTrial && (
-                    <Alert className="mb-4 bg-red-50 border-red-200">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                      <AlertTitle className="text-red-700">Подписка неактивна</AlertTitle>
-                      <AlertDescription className="text-red-600">
-                        Для доступа ко всем возможностям системы приобретите подписку.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {userData.isSubscriptionActive && userData.subscriptionEndDate && (
-                    <div className="mb-4">
-                      <p className="flex items-center text-sm text-muted-foreground">
-                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                        Подписка активна до {formatDate(userData.subscriptionEndDate)}
-                      </p>
+                  
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Прогресс подписки</span>
+                      <span>{Math.round(getSubscriptionProgress())}%</span>
                     </div>
-                  )}
-
-                  <Separator className="my-6" />
-
-                  <h3 className="text-lg font-semibold mb-4">Доступные тарифы</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="relative">
-                      <CardHeader className="bg-slate-50 rounded-t-lg">
-                        <CardTitle className="text-center">Базовый</CardTitle>
-                        <CardDescription className="text-center">
-                          Оптимально для старта
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="text-center mb-4">
-                          <span className="text-3xl font-bold">990 ₽</span>
-                          <span className="text-muted-foreground">/месяц</span>
-                        </div>
-                        <ul className="space-y-2 mb-6">
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">До 3-х подключенных магазинов</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Базовая аналитика</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Email поддержка</span>
-                          </li>
-                        </ul>
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          className="w-full"
-                          variant={userData.tariffId === "basic" ? "outline" : "default"}
-                          disabled={userData.tariffId === "basic" && userData.isSubscriptionActive}
-                          onClick={() => handleTariffSelection("basic")}
-                        >
-                          {userData.tariffId === "basic" && userData.isSubscriptionActive 
-                            ? "Текущий тариф" 
-                            : "Выбрать тариф"}
-                        </Button>
-                      </CardFooter>
-                      {userData.tariffId === "basic" && userData.isSubscriptionActive && (
-                        <div className="absolute top-2 right-2">
-                          <Badge className="bg-green-500">
-                            <Check className="h-3 w-3 mr-1" />
-                            Активен
-                          </Badge>
-                        </div>
-                      )}
-                    </Card>
-
-                    <Card className="relative border-blue-200 shadow-md">
-                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                        <Badge className="bg-blue-500">Популярный</Badge>
-                      </div>
-                      <CardHeader className="bg-blue-50 rounded-t-lg">
-                        <CardTitle className="text-center">Про</CardTitle>
-                        <CardDescription className="text-center">
-                          Для растущего бизнеса
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="text-center mb-4">
-                          <span className="text-3xl font-bold">1990 ₽</span>
-                          <span className="text-muted-foreground">/месяц</span>
-                        </div>
-                        <ul className="space-y-2 mb-6">
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">До 10 подключенных магазинов</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Расширенная аналитика</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Приоритетная поддержка</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">AI-рекомендации</span>
-                          </li>
-                        </ul>
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          className="w-full bg-blue-600 hover:bg-blue-700"
-                          variant={userData.tariffId === "pro" ? "outline" : "default"}
-                          disabled={userData.tariffId === "pro" && userData.isSubscriptionActive}
-                          onClick={() => handleTariffSelection("pro")}
-                        >
-                          {userData.tariffId === "pro" && userData.isSubscriptionActive 
-                            ? "Текущий тариф" 
-                            : "Выбрать тариф"}
-                        </Button>
-                      </CardFooter>
-                      {userData.tariffId === "pro" && userData.isSubscriptionActive && (
-                        <div className="absolute top-2 right-2">
-                          <Badge className="bg-green-500">
-                            <Check className="h-3 w-3 mr-1" />
-                            Активен
-                          </Badge>
-                        </div>
-                      )}
-                    </Card>
-
-                    <Card className="relative">
-                      <CardHeader className="bg-slate-50 rounded-t-lg">
-                        <CardTitle className="text-center">Безлимит</CardTitle>
-                        <CardDescription className="text-center">
-                          Для крупного бизнеса
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="text-center mb-4">
-                          <span className="text-3xl font-bold">5990 ₽</span>
-                          <span className="text-muted-foreground">/месяц</span>
-                        </div>
-                        <ul className="space-y-2 mb-6">
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Неограниченное число магазинов</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Полная аналитика</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Персональный менеджер</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                            <span className="text-sm">Выделенная поддержка 24/7</span>
-                          </li>
-                        </ul>
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          className="w-full"
-                          variant={userData.tariffId === "unlimited" ? "outline" : "default"}
-                          disabled={userData.tariffId === "unlimited" && userData.isSubscriptionActive}
-                          onClick={() => handleTariffSelection("unlimited")}
-                        >
-                          {userData.tariffId === "unlimited" && userData.isSubscriptionActive 
-                            ? "Текущий тариф" 
-                            : "Выбрать тариф"}
-                        </Button>
-                      </CardFooter>
-                      {userData.tariffId === "unlimited" && userData.isSubscriptionActive && (
-                        <div className="absolute top-2 right-2">
-                          <Badge className="bg-green-500">
-                            <Check className="h-3 w-3 mr-1" />
-                            Активен
-                          </Badge>
-                        </div>
-                      )}
-                    </Card>
+                    <Progress 
+                      value={getSubscriptionProgress()} 
+                      className={!currentSubscription.isActive && !userProfile?.isInTrial ? "h-2 bg-red-950" : "h-2"} 
+                    />
                   </div>
-                </div>
-
-                <Separator className="my-6" />
-
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">История платежей</h3>
-                  {isLoadingPaymentHistory ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : paymentHistory.length > 0 ? (
-                    <div className="rounded-md border">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Дата
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Сумма
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Тариф
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Статус
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {paymentHistory.map((payment) => (
-                            <tr key={payment.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {formatDate(payment.paymentDate)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                {payment.amount} ₽
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {payment.subscriptionType.charAt(0).toUpperCase() + payment.subscriptionType.slice(1)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge variant={payment.status === "completed" ? "outline" : "destructive"} className={payment.status === "completed" ? "border-green-500 text-green-600" : ""}>
-                                  {payment.status === "completed" ? "Выполнен" : "Отменен"}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      История платежей пуста
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Оплата подписки</DialogTitle>
-                <DialogDescription>
-                  Выберите способ оплаты для активации тарифа
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Выбранный тариф</h4>
-                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
-                    <div>
+                  
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Дата окончания:</span>
                       <span className="font-medium">
-                        {selectedTariff === "basic" 
-                          ? "Базовый" 
-                          : selectedTariff === "pro" 
-                          ? "Про" 
-                          : "Безлимит"}
-                      </span>
-                      <span className="ml-2 text-sm text-muted-foreground">
-                        ({
-                          selectedTariff === "basic" 
-                            ? "990 ₽" 
-                            : selectedTariff === "pro" 
-                            ? "1990 ₽" 
-                            : "5990 ₽"
-                        }/месяц)
+                        {userProfile?.isInTrial 
+                          ? (userProfile.trialEndDate ? formatDate(userProfile.trialEndDate) : 'N/A')
+                          : formatDate(currentSubscription.endDate)
+                        }
                       </span>
                     </div>
-                    <Badge>1 месяц</Badge>
+                    {(currentSubscription.isActive || userProfile?.isInTrial) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Осталось дней:</span>
+                        <Badge variant="outline">
+                          {userProfile?.isInTrial 
+                            ? (userProfile.trialEndDate ? Math.max(0, Math.ceil((new Date(userProfile.trialEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0)
+                            : currentSubscription.daysRemaining
+                          }
+                        </Badge>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Способ оплаты</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div
-                      className={`flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer 
-                        ${paymentMethod === "card" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
-                      onClick={() => handlePaymentMethodChange("card")}
-                    >
-                      <CreditCard className={`h-5 w-5 mb-2 ${paymentMethod === "card" ? "text-blue-500" : "text-gray-400"}`} />
-                      <span className="text-sm">Карта</span>
-                    </div>
-                    <div
-                      className={`flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer 
-                        ${paymentMethod === "qr" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
-                      onClick={() => handlePaymentMethodChange("qr")}
-                    >
-                      <Terminal className={`h-5 w-5 mb-2 ${paymentMethod === "qr" ? "text-blue-500" : "text-gray-400"}`} />
-                      <span className="text-sm">СБП</span>
-                    </div>
-                    <div
-                      className={`flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer 
-                        ${paymentMethod === "invoice" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
-                      onClick={() => handlePaymentMethodChange("invoice")}
-                    >
-                      <FileText className={`h-5 w-5 mb-2 ${paymentMethod === "invoice" ? "text-blue-500" : "text-gray-400"}`} />
-                      <span className="text-sm">Счет</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-4">
-                  <Switch
-                    id="agreement"
-                    checked={isAgreementAccepted}
-                    onCheckedChange={setIsAgreementAccepted}
-                  />
-                  <Label htmlFor="agreement" className="text-xs">
-                    Я согласен с <a href="/terms-of-service" target="_blank" className="text-blue-500 hover:underline">ус��овиями предоставления услуг</a> и <a href="/privacy-policy" target="_blank" className="text-blue-500 hover:underline">политикой конфиденциальности</a>
-                  </Label>
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowPaymentDialog(false)} disabled={isProcessingPayment}>
-                  Отмена
-                </Button>
-                <Button 
-                  onClick={handleProcessPayment} 
-                  disabled={!isAgreementAccepted || isProcessingPayment}
-                >
-                  {isProcessingPayment ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Обработка...
-                    </>
-                  ) : (
-                    "Оплатить"
+                  
+                  {userProfile?.isInTrial && (
+                    <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-300">
+                      <BadgePercent className="h-4 w-4" />
+                      <AlertDescription>
+                        После окончания пробного периода вам потребуется выбрать и оплатить один из доступных тарифов.
+                      </AlertDescription>
+                    </Alert>
                   )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                </CardContent>
+              </Card>
+            )}
+            
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <BadgePercent className="h-5 w-5 text-purple-500" />
+              Доступные тарифы
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {subscriptionPlans.map((plan) => (
+                <TariffCard
+                  key={plan.id}
+                  plan={plan}
+                  onClick={() => handleSelectPlan(plan.name)}
+                  isSelected={selectedPlan === plan.name}
+                />
+              ))}
+            </div>
+            
+            {selectedPlan && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarClock className="h-5 w-5 text-blue-500" />
+                    Выберите период подписки
+                  </CardTitle>
+                  <CardDescription>
+                    Чем дольше период подписки, тем больше скидка!
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup 
+                    value={selectedMonths.toString()} 
+                    onValueChange={(value) => handleMonthsChange(parseInt(value))}
+                    className="space-y-3"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="months-1" />
+                      <Label htmlFor="months-1" className="flex-1">1 месяц (без скидки)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="3" id="months-3" />
+                      <Label htmlFor="months-3" className="flex-1">
+                        3 месяца
+                        <Badge className="ml-2 bg-green-500">Скидка 10%</Badge>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="6" id="months-6" />
+                      <Label htmlFor="months-6" className="flex-1">
+                        6 месяцев
+                        <Badge className="ml-2 bg-green-500">Скидка 15%</Badge>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="12" id="months-12" />
+                      <Label htmlFor="months-12" className="flex-1">
+                        12 месяцев
+                        <Badge className="ml-2 bg-green-500">Скидка 25%</Badge>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                  
+                  {selectedPlan && (
+                    <div className="mt-6 p-4 bg-muted rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-muted-foreground">Выбранный тариф:</span>
+                        <Badge className="text-white" style={{
+                          background: subscriptionPlans.find(plan => plan.name === selectedPlan)?.color.replace('bg-', '')
+                        }}>
+                          {selectedPlan}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-muted-foreground">Период:</span>
+                        <span className="font-medium">{selectedMonths} {
+                          selectedMonths === 1 ? 'месяц' : 
+                          selectedMonths < 5 ? 'месяца' : 'месяцев'
+                        }</span>
+                      </div>
+                      {discountPercentage > 0 && (
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-muted-foreground">Скидка:</span>
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
+                            {discountPercentage}%
+                          </Badge>
+                        </div>
+                      )}
+                      <Separator className="my-3" />
+                      <div className="flex justify-between items-center font-bold">
+                        <span>Итого к оплате:</span>
+                        <span className="text-xl">
+                          {calculateTotalPrice(
+                            subscriptionPlans.find(plan => plan.name === selectedPlan)?.id || "1"
+                          ).toLocaleString('ru-RU')} ₽
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    className="w-full flex items-center gap-2"
+                    onClick={handleProceedToPayment}
+                    disabled={!selectedPlan}
+                  >
+                    <CreditCardIcon className="h-4 w-4" />
+                    Перейти к оплате
+                  </Button>
+                </CardFooter>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="security">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5 text-blue-500" />
-                  <span>Смена пароля</span>
-                </CardTitle>
-                <CardDescription>
-                  Обновите свой пароль для повышения безопасности
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PasswordChangeForm userId={userData.id} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-blue-500" />
-                  <span>Безопасность аккаунта</span>
-                </CardTitle>
-                <CardDescription>
-                  Настройки безопасности и защиты вашего аккаунта
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h4 className="text-sm font-medium">Двухфакторная аутентификация</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Дополнительный уровень защиты для вашего аккаунта
-                      </p>
+        <TabsContent value="payment">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCardIcon className="h-5 w-5 text-blue-500" />
+                Оплата подписки
+              </CardTitle>
+              <CardDescription>
+                Управление способами оплаты и завершение платежа
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {selectedPlan ? (
+                <Alert className="bg-blue-600/10 border-blue-600/20 dark:bg-blue-950/30 dark:border-blue-800/30">
+                  <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <AlertDescription className="text-blue-600 dark:text-blue-400">
+                    Вы выбрали тариф <strong>{selectedPlan}</strong> на срок {selectedMonths} {
+                      selectedMonths === 1 ? 'месяц' : 
+                      selectedMonths < 5 ? 'месяца' : 'месяцев'
+                    }. 
+                    {discountPercentage > 0 && ` Применена скидка ${discountPercentage}%.`}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Сначала выберите тарифный план в разделе "Подписка"
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Способы оплаты</h3>
+                
+                {!savedCard ? (
+                  <div className="border rounded-lg p-6">
+                    <div className="text-center mb-4">
+                      <CreditCardIcon className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                      <h3 className="text-lg font-medium">Нет сохраненных карт</h3>
+                      <p className="text-muted-foreground">Добавьте платежную карту ��ля оплаты</p>
                     </div>
-                    <Switch disabled />
+                    
+                    {isAddingCard ? (
+                      <div className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="card-number">Номер карты</Label>
+                          <Input
+                            id="card-number"
+                            placeholder="0000 0000 0000 0000"
+                            value={cardNumber}
+                            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                            className="font-mono"
+                            maxLength={19}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="expiry">Срок действия</Label>
+                            <Input
+                              id="expiry"
+                              placeholder="MM/YY"
+                              value={expiryDate}
+                              onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
+                              className="font-mono"
+                              maxLength={5}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="cvv">CVV</Label>
+                            <Input
+                              id="cvv"
+                              type="password"
+                              placeholder="•••"
+                              value={cvv}
+                              onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 3))}
+                              className="font-mono"
+                              maxLength={3}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                    
+                    <div className="mt-4">
+                      <Button
+                        variant={isAddingCard ? "default" : "outline"}
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={handleAddCard}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Обработка...
+                          </>
+                        ) : isAddingCard ? (
+                          <>
+                            <Check className="h-4 w-4" />
+                            Сохранить карту
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4" />
+                            Добавить карту
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                  
-                  <Separator />
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h4 className="text-sm font-medium">Уведомления о входе</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Получайте уведомления о входе в ваш аккаунт
-                      </p>
+                ) : (
+                  <div className="border rounded-lg p-6">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-16 rounded bg-primary/10 flex items-center justify-center">
+                          <CreditCardIcon className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">•••• •••• •••• {savedCard.lastFour}</p>
+                          <p className="text-sm text-muted-foreground">Срок действия: {savedCard.expiryDate}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={handleDeleteCard}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Switch defaultChecked />
                   </div>
-                  
-                  <Separator />
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h4 className="text-sm font-medium">Журнал активности</h4>
-                      <p className="text-muted-foreground text-xs">
-                        История входов и действий в системе
-                      </p>
+                )}
+              </div>
+              
+              {savedCard && selectedPlan && (
+                <div className="mt-6 p-4 bg-muted rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-muted-foreground">Выбранный тариф:</span>
+                    <Badge className="text-white" style={{
+                      background: subscriptionPlans.find(plan => plan.name === selectedPlan)?.color.replace('bg-', '')
+                    }}>
+                      {selectedPlan}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-muted-foreground">Период:</span>
+                    <span className="font-medium">{selectedMonths} {
+                      selectedMonths === 1 ? 'месяц' : 
+                      selectedMonths < 5 ? 'месяца' : 'месяцев'
+                    }</span>
+                  </div>
+                  {discountPercentage > 0 && (
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-muted-foreground">Скидка:</span>
+                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
+                        {discountPercentage}%
+                      </Badge>
                     </div>
-                    <Button variant="outline" size="sm">
-                      Просмотр
-                    </Button>
+                  )}
+                  <Separator className="my-3" />
+                  <div className="flex justify-between items-center font-bold">
+                    <span>Итого к оплате:</span>
+                    <span className="text-xl">
+                      {calculateTotalPrice(
+                        subscriptionPlans.find(plan => plan.name === selectedPlan)?.id || "1"
+                      ).toLocaleString('ru-RU')} ₽
+                    </span>
                   </div>
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full" disabled>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Проверить безопасность
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button 
+                className="w-full flex items-center gap-2"
+                disabled={!savedCard || !selectedPlan || isProcessing}
+                onClick={handlePayment}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Обработка платежа...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="h-4 w-4" />
+                    Оплатить подписку
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-blue-500" />
+                История платежей
+              </CardTitle>
+              <CardDescription>
+                Ваши прошлые платежи и транзакции
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHistory ? (
+                <div className="flex justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : paymentHistory.length === 0 ? (
+                <div className="text-center p-8">
+                  <p className="text-muted-foreground">История платежей пуста</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {paymentHistory.map((payment) => (
+                    <Card key={payment.id}>
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{payment.description}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatDate(payment.date)}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-4">
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              <CalendarClock className="h-3 w-3" />
+                              {payment.period} {
+                                payment.period === '1' ? 'месяц' : 
+                                Number(payment.period) < 5 ? 'месяца' : 'месяцев'
+                              }
+                            </Badge>
+                            <span className="font-bold text-lg">
+                              {payment.amount.toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
