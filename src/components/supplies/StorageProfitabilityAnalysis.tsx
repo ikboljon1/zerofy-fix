@@ -316,9 +316,8 @@ const StorageProfitabilityAnalysis: React.FC<StorageProfitabilityAnalysisProps> 
       const storageROI = totalStorageCost > 0 ? netProfit / totalStorageCost : 0;
       const storageCostToRevenueRatio = sellingPrice * currentStock > 0 ? totalStorageCost / (sellingPrice * currentStock) : 0;
       
-      // Calculate advertising metrics
-      const advertisingCost = Math.round(sellingPrice * 0.15); // Estimate ad cost as 15% of item price
-      const advertisingSalesMultiplier = 1.8; // Ads increase sales by 80%
+      const advertisingCost = Math.round(sellingPrice * 0.15);
+      const advertisingSalesMultiplier = 1.8;
       const newSalesWithAds = dailySales * advertisingSalesMultiplier;
       const newDaysOfInventoryWithAds = Math.round(currentStock / newSalesWithAds);
       const advertisingStorageCost = averageStock * newDaysOfInventoryWithAds * storageCost;
@@ -349,7 +348,6 @@ const StorageProfitabilityAnalysis: React.FC<StorageProfitabilityAnalysisProps> 
         action = 'keep';
       }
       
-      // Consider advertising as an option
       if (isVerySlowMoving && isHighMargin && advertisingROI > 0.2) {
         action = 'advertise';
         recommendedDiscount = 0;
@@ -366,7 +364,6 @@ const StorageProfitabilityAnalysis: React.FC<StorageProfitabilityAnalysisProps> 
       const profitWithDiscount = profitWithDiscountPerItem * currentStock - discountedStorageCost;
       const savingsWithDiscount = profitWithDiscount - profitWithoutDiscount;
       
-      // Extra logic for decision making
       if (profitWithDiscount < 0 && profitWithoutDiscount < 0 && profitWithDiscount < profitWithoutDiscount) {
         action = 'keep';
         recommendedDiscount = 0;
@@ -398,7 +395,6 @@ const StorageProfitabilityAnalysis: React.FC<StorageProfitabilityAnalysisProps> 
         }
       }
       
-      // Check if advertising would be more profitable than discounting
       if ((action === 'discount' || action === 'sell') && advertisingROI > 0.3 && isHighMargin) {
         action = 'advertise';
         recommendedDiscount = 0;
@@ -774,3 +770,35 @@ const StorageProfitabilityAnalysis: React.FC<StorageProfitabilityAnalysisProps> 
         description: "Маржинальность товара ниже 15%",
         value: `${result.profitMarginPercentage.toFixed(1)}%`,
         status: "warning",
+      });
+    }
+    
+    if (result.storageCostToRevenueRatio > 0.1) {
+      factors.push({
+        label: "Высокие затраты на хранение",
+        description: "Затраты на хранение превышают 10% от стоимости товара",
+        value: `${(result.storageCostToRevenueRatio * 100).toFixed(1)}%`,
+        status: "warning",
+      });
+    }
+    
+    if (result.daysOfInventory > 60) {
+      factors.push({
+        label: "Медленные продажи",
+        description: "Товар продается медленнее среднего",
+        value: formatDaysOfInventory(result.daysOfInventory),
+        status: "warning",
+      });
+    }
+    
+    return factors;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Component content would go here */}
+    </div>
+  );
+};
+
+export default StorageProfitabilityAnalysis;
