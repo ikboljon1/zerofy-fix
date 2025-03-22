@@ -91,6 +91,67 @@ export const getTariff = async (id: string): Promise<Tariff | null> => {
   }
 };
 
+// Helper function to handle trial expiration
+export const handleTrialExpiration = (userData: any): any => {
+  if (!userData) return userData;
+  
+  if (userData.isInTrial && userData.trialEndsAt) {
+    const trialEndDate = new Date(userData.trialEndsAt);
+    const now = new Date();
+    
+    if (now > trialEndDate) {
+      // Trial has expired
+      return {
+        ...userData,
+        isInTrial: false,
+        isSubscriptionActive: false,
+        tariffId: '1' // Downgrade to basic plan
+      };
+    }
+  }
+  
+  return userData;
+};
+
+// Apply tariff restrictions based on tariff ID
+export const applyTariffRestrictions = (tariffId: string): { storeLimit: number } => {
+  switch (tariffId) {
+    case '1':
+      return { storeLimit: 1 };
+    case '2':
+      return { storeLimit: 2 };
+    case '3':
+      return { storeLimit: 10 };
+    case '4':
+      return { storeLimit: 100 };
+    default:
+      return { storeLimit: 1 };
+  }
+};
+
+// Load tariffs (used by admin components)
+export const loadTariffs = async (): Promise<Tariff[]> => {
+  try {
+    // For now, just return the initial tariffs
+    return initialTariffs;
+  } catch (error) {
+    console.error('Error loading tariffs:', error);
+    return initialTariffs;
+  }
+};
+
+// Save tariffs (used by admin components)
+export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
+  try {
+    // For now, just log that we would save the tariffs
+    console.log('Would save tariffs:', tariffs);
+    return true;
+  } catch (error) {
+    console.error('Error saving tariffs:', error);
+    return false;
+  }
+};
+
 export const createOrUpdateTariffs = async (): Promise<void> => {
   try {
     // Function left intentionally empty until tariffs table is created
