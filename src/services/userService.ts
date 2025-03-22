@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // User type definition with role information
@@ -67,6 +66,8 @@ export interface SmtpSettings {
   secure: boolean;
   username: string;
   password: string;
+  fromEmail?: string;
+  fromName?: string;
 }
 
 export interface Pop3Settings {
@@ -75,6 +76,8 @@ export interface Pop3Settings {
   secure: boolean;
   username: string;
   password: string;
+  leaveOnServer?: boolean;
+  autoCheckInterval?: number;
 }
 
 export interface EmailSettings {
@@ -377,13 +380,15 @@ export const getCurrentUser = async (): Promise<User | null> => {
       .eq('id', data.user.id)
       .single();
     
+    if (!profileData) return null;
+    
     return {
       id: data.user.id,
       email: data.user.email || '',
       name: profileData?.name || data.user.email?.split('@')[0] || '',
-      role: profileData?.role as 'user' | 'admin' || 'user',
-      isSubscriptionActive: profileData?.subscription_type !== 'free' || false,
-      isInTrial: profileData?.subscription_type === 'trial' || false,
+      role: (profileData?.role as 'user' | 'admin') || 'user',
+      isSubscriptionActive: profileData?.subscription_type !== 'free',
+      isInTrial: profileData?.subscription_type === 'trial',
       trialEndsAt: profileData?.trial_ends_at,
       tariffId: profileData?.tariff_id,
       createdAt: data.user.created_at,
@@ -479,9 +484,17 @@ export const getUsers = async (): Promise<User[]> => {
 };
 
 // Add user (admin function)
-export const addUser = async (userData: Partial<User>, password: string): Promise<{success: boolean; message?: string}> => {
+export const addUser = async (userData: Partial<User>, password: string): Promise<User | {success: boolean; message?: string}> => {
   // Mock implementation
-  return { success: true };
+  return { 
+    id: 'new-user-id',
+    email: userData.email || '',
+    role: userData.role || 'user',
+    isSubscriptionActive: false,
+    isInTrial: false,
+    name: userData.name || '',
+    status: 'active'
+  };
 };
 
 // Calculate trial days left
@@ -561,7 +574,6 @@ export const getUserSubscriptionData = async (userId: string): Promise<Subscript
       tariffId: data.tariff_id,
       tariffName: getTariffName(data.tariff_id || '1')
     };
-    
   } catch (error) {
     console.error('Error getting user subscription data:', error);
     return null;
@@ -695,8 +707,9 @@ export const getPaymentHistory = async (userId: string): Promise<PaymentHistoryI
 };
 
 // Check feature access
-export const hasFeatureAccess = (user: User | null, feature: string): boolean => {
+export const hasFeatureAccess = (user: User | null, feature?: string): boolean => {
   if (!user) return false;
+  if (!feature) return true; // If no feature specified, just check if user exists
   
   // Admin has access to all features
   if (user.role === 'admin') return true;

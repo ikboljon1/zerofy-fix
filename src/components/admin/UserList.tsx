@@ -64,7 +64,6 @@ export default function UserList({ onSelectUser, onAddUser }: UserListProps) {
   const itemsPerPage = 5;
   const [paginatedUsers, setPaginatedUsers] = useState<User[]>([]);
 
-  // Memoize the fetchUsers function so it can be used in useEffect and as a callback
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -385,11 +384,18 @@ export default function UserList({ onSelectUser, onAddUser }: UserListProps) {
                           </div>
                         </div>
                         <div className="text-xs text-muted-foreground text-right hidden md:block">
-                          <div>Регистрация: {formatDate(user.registeredAt)}</div>
-                          <div>Последний вход: {user.lastLogin ? formatDate(user.lastLogin) : "—"}</div>
-                          {user.trialEndDate && (
-                            <div>Окончание пробного периода: {formatDate(user.trialEndDate)}</div>
-                          )}
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground text-sm">Дата регистрации:</span>
+                            <span className="text-sm">{user.registeredAt ? formatDate(user.registeredAt) : 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground text-sm">Последний вход:</span>
+                            <span className="text-sm">{user.lastLogin ? formatDate(user.lastLogin) : 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground text-sm">Пробный период до:</span>
+                            <span className="text-sm">{user.trialEndsAt ? formatDate(user.trialEndsAt) : 'N/A'}</span>
+                          </div>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

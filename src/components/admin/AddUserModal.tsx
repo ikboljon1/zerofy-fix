@@ -1,170 +1,141 @@
-
-import { useState } from "react";
-import { addUser, User } from "@/services/userService";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Mail, User as UserIcon, ShieldAlert } from "lucide-react";
+import { User, addUser } from "@/services/userService";
 
 interface AddUserModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  setIsOpen: (open: boolean) => void;
   onUserAdded: (user: User) => void;
 }
 
-export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserModalProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    role: "user" as "admin" | "user",
-  });
+const AddUserModal = ({ isOpen, setIsOpen, onUserAdded }: AddUserModalProps) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [company, setCompany] = useState('');
+  const [role, setRole] = useState<'admin' | 'user'>('user');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const { toast } = useToast();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleRoleChange = (role: "admin" | "user") => {
-    setFormData(prev => ({ ...prev, role }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddUser = async () => {
+  setIsSubmitting(true);
+  try {
+    // Update to match the addUser function signature
+    const result = await addUser({
+      name,
+      email,
+      phone,
+      company,
+      role
+    }, password);
     
-    if (!formData.name || !formData.email) {
+    // Check if result is a User object or a success/error response
+    if ('id' in result) {
+      // Result is a User object
+      onUserAdded(result);
+      setName('');
+      setEmail('');
+      setPassword('');
+      setPhone('');
+      setCompany('');
+      setRole('user');
+      setIsOpen(false);
       toast({
-        title: "Ошибка",
-        description: "Заполните все обязательные поля",
-        variant: "destructive",
+        title: "Пользователь добавлен",
+        description: "Новый пользователь успешно добавлен в систему",
       });
-      return;
+    } else if (result.success) {
+      // Result is a success response
+      toast({
+        title: "Пользователь добавлен",
+        description: "Новый пользователь успешно добавлен в систему",
+      });
+      setIsOpen(false);
+    } else {
+      // Result is an error response
+      setError(result.message || "Не удалось добавить пользователя");
     }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const newUser = await addUser({
-        ...formData,
-        status: "active",
-        registeredAt: new Date().toISOString(),
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name.replace(/\s+/g, '')}`
-      });
-      
-      toast({
-        title: "Успешно",
-        description: "Пользователь успешно добавлен",
-      });
-      
-      onUserAdded(newUser);
-      
-      // Reset form
-      setFormData({
-        name: "",
-        email: "",
-        role: "user",
-      });
-      
-      onClose();
-    } catch (error) {
-      console.error("Error adding user:", error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось добавить пользователя",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  } catch (error: any) {
+    setError(error.message || "Не удалось добавить пользователя");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-blue-500" />
-            <span>Добавить пользователя</span>
-          </DialogTitle>
+          <DialogTitle>Добавить нового пользователя</DialogTitle>
           <DialogDescription>
-            Добавьте нового пользователя в систему
+            Заполните все поля для создания нового пользователя.
           </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">ФИО</Label>
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input 
-                id="name"
-                name="name"
-                placeholder="Введите ФИО пользователя"
-                value={formData.name}
-                onChange={handleChange}
-                className="pl-9"
-              />
-            </div>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              ФИО
+            </Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input 
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Введите email пользователя"
-                value={formData.email}
-                onChange={handleChange}
-                className="pl-9"
-              />
-            </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="email" className="text-right">
+              Email
+            </Label>
+            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="role">Роль</Label>
-            <div className="relative">
-              <ShieldAlert className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              <Select 
-                value={formData.role} 
-                onValueChange={(value) => handleRoleChange(value as 'admin' | 'user')}
-              >
-                <SelectTrigger className="pl-9 w-full">
-                  <SelectValue placeholder="Выберите роль пользователя" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Администратор</SelectItem>
-                  <SelectItem value="user">Пользователь</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="password" className="text-right">
+              Пароль
+            </Label>
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="col-span-3" />
           </div>
-          
-          <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Отмена
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="gap-1 bg-blue-600 hover:bg-blue-700">
-              {isSubmitting && <span className="animate-spin">&#8230;</span>}
-              <UserPlus className="h-4 w-4" />
-              <span>Добавить</span>
-            </Button>
-          </DialogFooter>
-        </form>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="phone" className="text-right">
+              Телефон
+            </Label>
+            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="company" className="text-right">
+              Компания
+            </Label>
+            <Input id="company" value={company} onChange={(e) => setCompany(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="role" className="text-right">
+              Роль
+            </Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Выберите роль" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Администратор</SelectItem>
+                <SelectItem value="user">Пользователь</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {error && <p className="text-red-500">{error}</p>}
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>
+            Отмена
+          </Button>
+          <Button type="submit" onClick={handleAddUser} disabled={isSubmitting}>
+            {isSubmitting ? 'Создание...' : 'Создать'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default AddUserModal;
