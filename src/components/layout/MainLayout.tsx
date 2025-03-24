@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Home, BarChart2, Package, ShoppingBag, User, Calculator, Sun, Moon, Zap, Megaphone, Settings, LogOut, WarehouseIcon, MenuIcon, Clock } from "lucide-react";
 import { motion } from "framer-motion";
@@ -63,6 +64,8 @@ const MainLayout = ({
   const handleMenuItemClick = (value: string) => {
     if (value === 'logout') {
       handleLogout();
+    } else if (value === 'admin' && user?.role === 'admin') {
+      navigate('/admin');
     } else {
       onTabChange(value);
     }
@@ -144,6 +147,13 @@ const MainLayout = ({
                       Профиль
                     </Button>
                     
+                    {user?.role === 'admin' && (
+                      <Button variant="ghost" className="justify-start" onClick={() => navigate('/admin')}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        Админ панель
+                      </Button>
+                    )}
+                    
                     <div className="border-t my-2 pt-2">
                       {profileMenu.map(item => <Button key={item.value} variant="ghost" className="justify-start w-full" onClick={() => handleMenuItemClick(item.value)}>
                           <item.icon className="mr-2 h-4 w-4" />
@@ -190,6 +200,12 @@ const MainLayout = ({
                   <User className="mr-2 h-4 w-4" />
                   Профиль
                 </Button>
+                {user?.role === 'admin' && (
+                  <Button variant="ghost" onClick={() => navigate('/admin')} className={activeTab === "admin" ? "bg-accent" : ""}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Админ панель
+                  </Button>
+                )}
               </nav>
             </div>
             <div className="flex items-center space-x-4">

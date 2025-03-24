@@ -48,7 +48,7 @@ const Index = () => {
     setUser(parsedUser);
     
     // Check if user has access (trial or active subscription)
-    const access = hasFeatureAccess(parsedUser);
+    const access = hasFeatureAccess("advancedMetrics", parsedUser);
     setHasAccess(access);
     
     // Calculate trial days if in trial
@@ -86,7 +86,7 @@ const Index = () => {
   const handleUserUpdated = (updatedUser: User) => {
     setUser(updatedUser);
     // Re-check access with updated user data
-    setHasAccess(hasFeatureAccess(updatedUser));
+    setHasAccess(hasFeatureAccess("advancedMetrics", updatedUser));
     
     if (updatedUser.isInTrial) {
       setTrialDaysLeft(getTrialDaysRemaining(updatedUser));
