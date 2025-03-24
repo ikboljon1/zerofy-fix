@@ -220,3 +220,47 @@ export const deleteTariff = async (id: string): Promise<boolean> => {
     return false;
   }
 };
+
+// This function applies restrictions based on the user's tariff ID
+export const applyTariffRestrictions = (tariffId: string): { storeLimit: number; } => {
+  // Find the tariff in initialTariffs
+  const tariff = initialTariffs.find(t => t.id === tariffId);
+  
+  if (tariff) {
+    return {
+      storeLimit: tariff.storeLimit
+    };
+  }
+  
+  // Default values for unknown tariffs
+  return {
+    storeLimit: 1 // Default to basic plan limit
+  };
+};
+
+// Function to handle trial expiration and update user data
+export const handleTrialExpiration = (userData: any): any => {
+  if (!userData || !userData.isInTrial) {
+    return userData;
+  }
+  
+  // Check if trial has expired
+  const trialEndDate = userData.trialEndDate ? new Date(userData.trialEndDate) : null;
+  const now = new Date();
+  
+  if (trialEndDate && now > trialEndDate) {
+    // Trial has expired, update user data
+    const updatedUser = {
+      ...userData,
+      isInTrial: false,
+      tariffId: '1', // Downgrade to basic plan
+    };
+    
+    // Save updated user data to localStorage
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    return updatedUser;
+  }
+  
+  return userData;
+};
