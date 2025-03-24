@@ -55,28 +55,34 @@ export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserMo
     setIsSubmitting(true);
     
     try {
-      const newUser = await addUser({
+      const newUserData = {
         ...formData,
         status: "active",
         registeredAt: new Date().toISOString(),
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name.replace(/\s+/g, '')}`
-      });
+      };
       
-      toast({
-        title: "Успешно",
-        description: "Пользователь успешно добавлен",
-      });
+      const response = await addUser(newUserData);
       
-      onUserAdded(newUser);
-      
-      // Reset form
-      setFormData({
-        name: "",
-        email: "",
-        role: "user",
-      });
-      
-      onClose();
+      if (response && 'id' in response) {
+        toast({
+          title: "Успешно",
+          description: "Пользователь успешно добавлен",
+        });
+        
+        onUserAdded(response as User);
+        
+        // Reset form
+        setFormData({
+          name: "",
+          email: "",
+          role: "user",
+        });
+        
+        onClose();
+      } else {
+        throw new Error("Неверный ответ от сервера");
+      }
     } catch (error) {
       console.error("Error adding user:", error);
       toast({

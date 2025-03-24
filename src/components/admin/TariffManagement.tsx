@@ -1,20 +1,32 @@
 
 import { useState, useEffect } from "react";
-import { 
-  Tag, 
-  Plus, 
-  PenSquare, 
-  Trash2, 
-  Check, 
-  X, 
-  CreditCard,
-  BadgePercent,
-  Store
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Edit, Trash2, CheckCircle2, Save, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { initialTariffs, Tariff, fetchTariffs, updateTariff, createTariff, deleteTariff } from "@/data/tariffs";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -23,650 +35,701 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tariff, loadTariffs, saveTariffs } from "@/data/tariffs";
 
-interface TariffFormData {
+type TariffFormData = {
   id: string;
   name: string;
+  description: string;
   price: number;
-  billingPeriod: string;
+  period: "monthly" | "yearly";
   features: string[];
   isPopular: boolean;
+  isActive: boolean;
+  billingPeriod: string;
   storeLimit: number;
-}
+};
 
 const TariffManagement = () => {
-  const [tariffs, setTariffs] = useState<Tariff[]>([]);
-  const [selectedTariff, setSelectedTariff] = useState<TariffFormData | null>(null);
+  const [tariffs, setTariffs] = useState<Tariff[]>(initialTariffs);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newFeature, setNewFeature] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [currentTariff, setCurrentTariff] = useState<TariffFormData>({
+    id: "",
+    name: "",
+    description: "",
+    price: 0,
+    period: "monthly",
+    features: [],
+    isPopular: false,
+    isActive: true,
+    billingPeriod: "Ежемесячно",
+    storeLimit: 1
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState("available");
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchTariffs = async () => {
-      setIsLoading(true);
-      try {
-        const loadedTariffs = await loadTariffs();
-        setTariffs(loadedTariffs);
-      } catch (error) {
-        console.error("Ошибка при загрузке тарифов:", error);
-        toast({
-          title: "Ошибка загрузки",
-          description: "Не удалось загрузить тарифы. Используются стандартные значения.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchTariffs();
-  }, [toast]);
+    loadTariffs();
+  }, []);
+
+  const loadTariffs = async () => {
+    try {
+      const data = await fetchTariffs();
+      setTariffs(data);
+    } catch (error) {
+      console.error("Error loading tariffs:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить тарифы",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleEditTariff = (tariff: Tariff) => {
-    setSelectedTariff({ 
-      ...tariff, 
-      billingPeriod: convertPeriodToRussian(tariff.period)
+    setCurrentTariff({
+      id: tariff.id,
+      name: tariff.name,
+      description: tariff.description,
+      price: tariff.price,
+      period: tariff.period,
+      features: tariff.features,
+      isPopular: tariff.isPopular,
+      isActive: tariff.isActive,
+      billingPeriod: tariff.billingPeriod,
+      storeLimit: tariff.storeLimit
     });
     setIsEditDialogOpen(true);
   };
 
   const handleDeleteTariff = (tariff: Tariff) => {
-    setSelectedTariff({ 
-      ...tariff, 
-      billingPeriod: convertPeriodToRussian(tariff.period)
+    setCurrentTariff({
+      id: tariff.id,
+      name: tariff.name,
+      description: tariff.description,
+      price: tariff.price,
+      period: tariff.period,
+      features: tariff.features,
+      isPopular: tariff.isPopular,
+      isActive: tariff.isActive,
+      billingPeriod: tariff.billingPeriod,
+      storeLimit: tariff.storeLimit
     });
     setIsDeleteDialogOpen(true);
   };
 
-  const convertPeriodToRussian = (period: string): string => {
-    switch (period) {
-      case 'monthly': return 'месяц';
-      case 'yearly': return 'год';
-      case 'weekly': return 'неделя';
-      case 'daily': return 'день';
-      default: return 'месяц';
-    }
-  };
-
-  const convertPeriodToEnglish = (period: string): 'monthly' | 'yearly' | 'weekly' | 'daily' => {
-    switch (period) {
-      case 'месяц': return 'monthly';
-      case 'год': return 'yearly';
-      case 'неделя': return 'weekly';
-      case 'день': return 'daily';
-      default: return 'monthly';
-    }
-  };
-
   const confirmDeleteTariff = async () => {
-    if (selectedTariff) {
-      setIsSaving(true);
-      try {
-        const updatedTariffs = tariffs.filter((tariff) => tariff.id !== selectedTariff.id);
-        const success = await saveTariffs(updatedTariffs);
-        
-        if (success) {
-          setTariffs(updatedTariffs);
-          toast({
-            title: "Тариф удален",
-            description: `Тариф "${selectedTariff.name}" был успешно удален.`,
-          });
-        } else {
-          toast({
-            title: "Предупреждение",
-            description: "Тариф удален только локально. Изменения будут синхронизированы при восстановлении соединения.",
-            variant: "warning"
-          });
-        }
-      } catch (error) {
-        console.error("Ошибка при удалении тарифа:", error);
+    setIsSubmitting(true);
+    try {
+      const success = await deleteTariff(currentTariff.id);
+      if (success) {
+        setTariffs(tariffs.filter((t) => t.id !== currentTariff.id));
         toast({
-          title: "Ошибка",
-          description: "Не удалось удалить тариф. Повторите попытку позже.",
-          variant: "destructive"
+          title: "Тариф удален",
+          description: `Тариф "${currentTariff.name}" был успешно удален.`,
         });
-      } finally {
-        setIsSaving(false);
-        setIsDeleteDialogOpen(false);
+      } else {
+        throw new Error("Failed to delete tariff");
       }
+      setIsDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error deleting tariff:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить тариф",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const saveTariffChanges = async () => {
-    if (selectedTariff) {
-      setIsSaving(true);
-      try {
-        const updatedTariff: Tariff = {
-          id: selectedTariff.id,
-          name: selectedTariff.name,
-          price: selectedTariff.price,
-          period: convertPeriodToEnglish(selectedTariff.billingPeriod),
-          description: selectedTariff.id === '1' 
-            ? 'Идеально для начинающих продавцов' 
-            : selectedTariff.id === '2' 
-              ? 'Для растущих магазинов' 
-              : 'Комплексное решение для крупных продавцов',
-          features: selectedTariff.features,
-          isPopular: selectedTariff.isPopular,
-          isActive: true,
-          storeLimit: selectedTariff.storeLimit
-        };
-
-        const updatedTariffs = tariffs.map((tariff) => 
-          (tariff.id === selectedTariff.id ? updatedTariff : tariff)
-        );
-        
-        const success = await saveTariffs(updatedTariffs);
-        
-        if (success) {
-          setTariffs(updatedTariffs);
-          toast({
-            title: "Изменения сохранены",
-            description: "Данные тарифа были успешно обновлены.",
-          });
-        } else {
-          toast({
-            title: "Предупреждение",
-            description: "Изменения сохранены локально. Они будут синхронизированы при восстановлении соединения.",
-            variant: "warning"
-          });
-        }
-      } catch (error) {
-        console.error("Ошибка при сохранении тарифа:", error);
-        toast({
-          title: "Ошибка",
-          description: "Не удалось сохранить изменения. Повторите попытку позже.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsSaving(false);
-        setIsEditDialogOpen(false);
-      }
-    }
-  };
-
-  const addNewTariff = async () => {
-    if (selectedTariff) {
-      setIsSaving(true);
-      try {
-        const newTariff: Tariff = {
-          id: Date.now().toString(),
-          name: selectedTariff.name,
-          price: selectedTariff.price,
-          period: convertPeriodToEnglish(selectedTariff.billingPeriod),
-          description: 'Новый тарифный план',
-          features: selectedTariff.features,
-          isPopular: selectedTariff.isPopular,
-          isActive: true,
-          storeLimit: selectedTariff.storeLimit || 1
-        };
-        
-        const updatedTariffs = [...tariffs, newTariff];
-        const success = await saveTariffs(updatedTariffs);
-        
-        if (success) {
-          setTariffs(updatedTariffs);
-          toast({
-            title: "Тариф добавлен",
-            description: `Тариф "${newTariff.name}" был успешно добавлен.`,
-          });
-        } else {
-          toast({
-            title: "Предупреждение",
-            description: "Тариф добавлен локально. Изменения будут синхронизированы при восстановлении соединения.",
-            variant: "warning"
-          });
-        }
-      } catch (error) {
-        console.error("Ошибка при добавлении тарифа:", error);
-        toast({
-          title: "Ошибка",
-          description: "Не удалось добавить тариф. Повторите попытку позже.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsSaving(false);
-        setIsAddDialogOpen(false);
-      }
-    }
-  };
-
-  const startAddingTariff = () => {
-    setSelectedTariff({
+  const handleAddNewTariff = () => {
+    setCurrentTariff({
       id: "",
       name: "",
+      description: "",
       price: 0,
-      billingPeriod: "месяц",
+      period: "monthly",
       features: [],
       isPopular: false,
+      isActive: true,
+      billingPeriod: "Ежемесячно",
       storeLimit: 1
     });
     setIsAddDialogOpen(true);
   };
 
-  const addFeature = () => {
-    if (selectedTariff && newFeature.trim()) {
-      setSelectedTariff({
-        ...selectedTariff,
-        features: [...selectedTariff.features, newFeature.trim()],
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setCurrentTariff((prev) => ({
+      ...prev,
+      [name]: name === "price" || name === "storeLimit" ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handleFeaturesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const featuresArray = e.target.value
+      .split("\n")
+      .map((feature) => feature.trim())
+      .filter((feature) => feature !== "");
+    setCurrentTariff((prev) => ({ ...prev, features: featuresArray }));
+  };
+
+  const handlePeriodChange = (value: "monthly" | "yearly") => {
+    setCurrentTariff((prev) => ({ 
+      ...prev, 
+      period: value,
+      billingPeriod: value === "monthly" ? "Ежемесячно" : "Ежегодно"
+    }));
+  };
+
+  const handleToggleChange = (name: "isPopular" | "isActive") => {
+    setCurrentTariff((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  const saveTariff = async () => {
+    setIsSubmitting(true);
+    try {
+      if (!currentTariff.name || currentTariff.price <= 0) {
+        toast({
+          title: "Ошибка валидации",
+          description: "Пожалуйста, заполните все обязательные поля",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (isEditDialogOpen) {
+        // Update existing tariff
+        const success = await updateTariff(currentTariff as Tariff);
+        if (success) {
+          const updatedTariffs = tariffs.map((t) =>
+            t.id === currentTariff.id ? currentTariff as Tariff : t
+          );
+          setTariffs(updatedTariffs);
+          setIsEditDialogOpen(false);
+          toast({
+            title: "Тариф обновлен",
+            description: `Тариф "${currentTariff.name}" был успешно обновлен.`,
+          });
+        } else {
+          throw new Error("Failed to update tariff");
+        }
+      } else {
+        // Create new tariff
+        const { id, ...newTariffData } = currentTariff;
+        const newTariff = await createTariff(newTariffData);
+        if (newTariff) {
+          setTariffs([...tariffs, newTariff]);
+          setIsAddDialogOpen(false);
+          toast({
+            title: "Тариф добавлен",
+            description: `Тариф "${newTariff.name}" был успешно добавлен.`,
+          });
+        } else {
+          throw new Error("Failed to create tariff");
+        }
+      }
+    } catch (error) {
+      console.error("Error saving tariff:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сохранить тариф",
+        variant: "destructive",
       });
-      setNewFeature("");
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const removeFeature = (index: number) => {
-    if (selectedTariff) {
-      const updatedFeatures = [...selectedTariff.features];
-      updatedFeatures.splice(index, 1);
-      setSelectedTariff({
-        ...selectedTariff,
-        features: updatedFeatures,
-      });
-    }
-  };
-
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat("ru-RU").format(price);
-  };
-
-  const getStoreLimitText = (limit: number): string => {
-    if (limit === 999) return "Неограниченно";
-    return `${limit} ${limit === 1 ? 'магазин' : limit < 5 ? 'магазина' : 'магазинов'}`;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center p-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <BadgePercent className="h-5 w-5" />
-              Управление тарифами
-            </h2>
-            <Button onClick={startAddingTariff} disabled={isSaving}>
-              <Plus className="mr-2 h-4 w-4" />
-              Добавить тариф
-            </Button>
-          </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Управление тарифами</h2>
+        <Button onClick={handleAddNewTariff}>
+          <Plus className="mr-2 h-4 w-4" />
+          Добавить тариф
+        </Button>
+      </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {tariffs.map((tariff) => (
-              <Card key={tariff.id} className={`border-2 ${tariff.isPopular ? 'border-primary' : ''}`}>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">{tariff.name}</h3>
-                    {tariff.isPopular && (
-                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary/20 text-primary">
-                        Популярный
+      <Tabs defaultValue="available" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="available">Активные тарифы</TabsTrigger>
+          <TabsTrigger value="archived">Архивные тарифы</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="available">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {tariffs
+              .filter((tariff) => tariff.isActive)
+              .map((tariff) => (
+                <Card
+                  key={tariff.id}
+                  className={`flex flex-col ${
+                    tariff.isPopular
+                      ? "border-blue-400 dark:border-blue-600"
+                      : ""
+                  }`}
+                >
+                  {tariff.isPopular && (
+                    <div className="bg-blue-600 text-white text-center py-1 text-sm font-medium">
+                      Популярный выбор
+                    </div>
+                  )}
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      {tariff.name}
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditTariff(tariff)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteTariff(tariff)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardTitle>
+                    <div className="text-3xl font-bold">
+                      {tariff.price.toLocaleString()} ₽
+                      <span className="text-sm font-normal text-muted-foreground ml-1">
+                        /{tariff.period === "monthly" ? "мес" : "год"}
                       </span>
-                    )}
-                  </div>
-                  
-                  <div className="mb-4">
-                    <span className="text-3xl font-bold">{formatPrice(tariff.price)} ₽</span>
-                    <span className="text-sm text-muted-foreground">/{convertPeriodToRussian(tariff.period)}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 mb-4 text-blue-600">
-                    <Store className="h-4 w-4" />
-                    <span>{getStoreLimitText(tariff.storeLimit)}</span>
-                  </div>
-                  
-                  <ul className="space-y-2 mb-6">
-                    {tariff.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <div className="flex gap-2 justify-end mt-auto">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleEditTariff(tariff)}
-                      disabled={isSaving}
-                    >
-                      <PenSquare className="h-4 w-4 mr-1" />
-                      Изменить
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => handleDeleteTariff(tariff)}
-                      disabled={isSaving}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Удалить
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {tariff.description}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <ul className="space-y-2">
+                      {tariff.features.map((feature, index) => (
+                        <li key={index} className="flex items-start">
+                          <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-1 shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                  <CardFooter className="pt-2 flex flex-col items-start">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Лимит магазинов: {tariff.storeLimit === 999 ? "Неограничено" : tariff.storeLimit}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Период: {tariff.billingPeriod}
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
 
+        <TabsContent value="archived">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {tariffs
+              .filter((tariff) => !tariff.isActive)
+              .map((tariff) => (
+                <Card
+                  key={tariff.id}
+                  className="flex flex-col opacity-75 hover:opacity-100 transition-opacity"
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      {tariff.name}
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditTariff(tariff)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteTariff(tariff)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardTitle>
+                    <div className="text-3xl font-bold">
+                      {tariff.price.toLocaleString()} ₽
+                      <span className="text-sm font-normal text-muted-foreground ml-1">
+                        /{tariff.period === "monthly" ? "мес" : "год"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {tariff.description}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <div className="bg-destructive/10 text-destructive text-sm p-2 rounded mb-3">
+                      Этот тариф находится в архиве и не отображается для
+                      пользователей
+                    </div>
+                    <ul className="space-y-2">
+                      {tariff.features.map((feature, index) => (
+                        <li key={index} className="flex items-start">
+                          <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-1 shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                  <CardFooter className="pt-2 flex flex-col items-start">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Лимит магазинов: {tariff.storeLimit === 999 ? "Неограничено" : tariff.storeLimit}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Период: {tariff.billingPeriod}
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            {tariffs.filter((tariff) => !tariff.isActive).length === 0 && (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                Нет архивных тарифов
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Tariff Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Добавить новый тариф</DialogTitle>
+            <DialogDescription>
+              Введите детали нового тарифного плана
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Название тарифа</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={currentTariff.name}
+                  onChange={handleInputChange}
+                  placeholder="Например: Базовый"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price">Стоимость (₽)</Label>
+                <Input
+                  id="price"
+                  name="price"
+                  type="number"
+                  value={currentTariff.price || ""}
+                  onChange={handleInputChange}
+                  placeholder="Например: 1500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Описание</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={currentTariff.description}
+                onChange={handleInputChange}
+                placeholder="Краткое описание тарифа"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="features">
+                Функции и возможности (каждая с новой строки)
+              </Label>
+              <Textarea
+                id="features"
+                value={currentTariff.features.join("\n")}
+                onChange={handleFeaturesChange}
+                placeholder="Например:
+Базовая аналитика
+Подключение 1 магазина
+Отчеты о продажах"
+                rows={6}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Период оплаты</Label>
+                <RadioGroup
+                  value={currentTariff.period}
+                  onValueChange={(value) => handlePeriodChange(value as "monthly" | "yearly")}
+                  className="flex flex-col space-y-1"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="monthly" id="monthly" />
+                    <Label htmlFor="monthly" className="font-normal">
+                      Ежемесячно
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yearly" id="yearly" />
+                    <Label htmlFor="yearly" className="font-normal">
+                      Ежегодно
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="storeLimit">Лимит магазинов</Label>
+                <Input
+                  id="storeLimit"
+                  name="storeLimit"
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={currentTariff.storeLimit || ""}
+                  onChange={handleInputChange}
+                  placeholder="Например: 1"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Введите 999 для неограниченного количества
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isPopular"
+                  checked={currentTariff.isPopular}
+                  onCheckedChange={() => handleToggleChange("isPopular")}
+                />
+                <Label htmlFor="isPopular" className="font-normal">
+                  Отметить как популярный
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isActive"
+                  checked={currentTariff.isActive}
+                  onCheckedChange={() => handleToggleChange("isActive")}
+                />
+                <Label htmlFor="isActive" className="font-normal">
+                  Активен (виден пользователям)
+                </Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Отмена
+            </Button>
+            <Button onClick={saveTariff} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="inline-block animate-spin mr-2">⟳</span>
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tariff Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Редактировать тариф</DialogTitle>
             <DialogDescription>
-              Внесите изменения в данные тарифа
+              Измените детали тарифного плана
             </DialogDescription>
           </DialogHeader>
-          {selectedTariff && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="name" className="text-right text-sm">
-                  Название
-                </label>
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Название тарифа</Label>
                 <Input
-                  id="name"
-                  value={selectedTariff.name}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, name: e.target.value })
-                  }
-                  className="col-span-3"
+                  id="edit-name"
+                  name="name"
+                  value={currentTariff.name}
+                  onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="price" className="text-right text-sm">
-                  Цена (₽)
-                </label>
+              <div className="space-y-2">
+                <Label htmlFor="edit-price">Стоимость (₽)</Label>
                 <Input
-                  id="price"
+                  id="edit-price"
+                  name="price"
                   type="number"
-                  value={selectedTariff.price}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, price: Number(e.target.value) })
-                  }
-                  className="col-span-3"
+                  value={currentTariff.price || ""}
+                  onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="storeLimit" className="text-right text-sm">
-                  Лимит магазинов
-                </label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Описание</Label>
+              <Textarea
+                id="edit-description"
+                name="description"
+                value={currentTariff.description}
+                onChange={handleInputChange}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-features">
+                Функции и возможности (каждая с новой строки)
+              </Label>
+              <Textarea
+                id="edit-features"
+                value={currentTariff.features.join("\n")}
+                onChange={handleFeaturesChange}
+                rows={6}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Период оплаты</Label>
+                <RadioGroup
+                  value={currentTariff.period}
+                  onValueChange={(value) => handlePeriodChange(value as "monthly" | "yearly")}
+                  className="flex flex-col space-y-1"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="monthly" id="edit-monthly" />
+                    <Label htmlFor="edit-monthly" className="font-normal">
+                      Ежемесячно
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yearly" id="edit-yearly" />
+                    <Label htmlFor="edit-yearly" className="font-normal">
+                      Ежегодно
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-storeLimit">Лимит магазинов</Label>
                 <Input
-                  id="storeLimit"
+                  id="edit-storeLimit"
+                  name="storeLimit"
                   type="number"
                   min="1"
                   max="999"
-                  value={selectedTariff.storeLimit}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, storeLimit: Number(e.target.value) })
-                  }
-                  className="col-span-3"
+                  value={currentTariff.storeLimit || ""}
+                  onChange={handleInputChange}
                 />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="billingPeriod" className="text-right text-sm">
-                  Период
-                </label>
-                <select
-                  id="billingPeriod"
-                  value={selectedTariff.billingPeriod}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, billingPeriod: e.target.value })
-                  }
-                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="день">день</option>
-                  <option value="неделя">неделя</option>
-                  <option value="месяц">месяц</option>
-                  <option value="год">год</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="isPopular" className="text-right text-sm">
-                  Популярный
-                </label>
-                <div className="col-span-3 flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isPopular"
-                    checked={selectedTariff.isPopular}
-                    onChange={(e) =>
-                      setSelectedTariff({ ...selectedTariff, isPopular: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="isPopular" className="ml-2 text-sm">
-                    Пометить как популярный тариф
-                  </label>
-                </div>
-              </div>
-              
-              <div className="mt-2">
-                <label className="text-sm font-medium mb-2 block">
-                  Функции тарифа
-                </label>
-                <div className="space-y-2">
-                  {selectedTariff.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input value={feature} readOnly className="flex-1" />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFeature(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Добавить функцию..."
-                      value={newFeature}
-                      onChange={(e) => setNewFeature(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={addFeature} disabled={!newFeature.trim()}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Введите 999 для неограниченного количества
+                </p>
               </div>
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="edit-isPopular"
+                  checked={currentTariff.isPopular}
+                  onCheckedChange={() => handleToggleChange("isPopular")}
+                />
+                <Label htmlFor="edit-isPopular" className="font-normal">
+                  Отметить как популярный
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="edit-isActive"
+                  checked={currentTariff.isActive}
+                  onCheckedChange={() => handleToggleChange("isActive")}
+                />
+                <Label htmlFor="edit-isActive" className="font-normal">
+                  Активен (виден пользователям)
+                </Label>
+              </div>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              <X className="mr-2 h-4 w-4" />
               Отмена
             </Button>
-            <Button onClick={saveTariffChanges}>Сохранить</Button>
+            <Button onClick={saveTariff} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="inline-block animate-spin mr-2">⟳</span>
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Сохранить
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Удалить тариф</DialogTitle>
-            <DialogDescription>
-              Вы уверены, что хотите удалить тариф?
-            </DialogDescription>
-          </DialogHeader>
-          {selectedTariff && (
-            <div className="grid gap-4 py-4">
-              <div className="flex items-center justify-center gap-3 p-4 border rounded-lg bg-muted/50">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <Tag className="h-6 w-6 text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium">{selectedTariff.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatPrice(selectedTariff.price)} ₽/{selectedTariff.billingPeriod}
-                  </p>
-                </div>
-              </div>
-              <p className="text-center text-muted-foreground">
-                Это действие нельзя отменить. Тариф будет удален навсегда.
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              <X className="mr-2 h-4 w-4" />
+      {/* Delete Tariff Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удаление тарифа</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы уверены, что хотите удалить тариф "{currentTariff.name}"? Это
+              действие невозможно отменить.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>
               Отмена
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteTariff}>
-              <Trash2 className="mr-2 h-4 w-4" />
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeleteTariff();
+              }}
+              disabled={isSubmitting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSubmitting ? (
+                <span className="inline-block animate-spin mr-2">⟳</span>
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
               Удалить
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Добавить тариф</DialogTitle>
-            <DialogDescription>
-              Введите данные нового тарифа
-            </DialogDescription>
-          </DialogHeader>
-          {selectedTariff && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="new-name" className="text-right text-sm">
-                  Название
-                </label>
-                <Input
-                  id="new-name"
-                  value={selectedTariff.name}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, name: e.target.value })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="new-price" className="text-right text-sm">
-                  Цена (₽)
-                </label>
-                <Input
-                  id="new-price"
-                  type="number"
-                  value={selectedTariff.price}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, price: Number(e.target.value) })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="new-storeLimit" className="text-right text-sm">
-                  Лимит магазинов
-                </label>
-                <Input
-                  id="new-storeLimit"
-                  type="number"
-                  min="1"
-                  max="999"
-                  value={selectedTariff.storeLimit}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, storeLimit: Number(e.target.value) })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="new-billingPeriod" className="text-right text-sm">
-                  Период
-                </label>
-                <select
-                  id="new-billingPeriod"
-                  value={selectedTariff.billingPeriod}
-                  onChange={(e) =>
-                    setSelectedTariff({ ...selectedTariff, billingPeriod: e.target.value })
-                  }
-                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="день">день</option>
-                  <option value="неделя">неделя</option>
-                  <option value="месяц">месяц</option>
-                  <option value="год">год</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="new-isPopular" className="text-right text-sm">
-                  Популярный
-                </label>
-                <div className="col-span-3 flex items-center">
-                  <input
-                    type="checkbox"
-                    id="new-isPopular"
-                    checked={selectedTariff.isPopular}
-                    onChange={(e) =>
-                      setSelectedTariff({ ...selectedTariff, isPopular: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="new-isPopular" className="ml-2 text-sm">
-                    Пометить как популярный тариф
-                  </label>
-                </div>
-              </div>
-              
-              <div className="mt-2">
-                <label className="text-sm font-medium mb-2 block">
-                  Функции тарифа
-                </label>
-                <div className="space-y-2">
-                  {selectedTariff.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input value={feature} readOnly className="flex-1" />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFeature(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Добавить функцию..."
-                      value={newFeature}
-                      onChange={(e) => setNewFeature(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={addFeature} disabled={!newFeature.trim()}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              <X className="mr-2 h-4 w-4" />
-              Отмена
-            </Button>
-            <Button onClick={addNewTariff}>
-              <Check className="mr-2 h-4 w-4" />
-              Добавить
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

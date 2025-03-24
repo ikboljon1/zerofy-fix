@@ -1,223 +1,222 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 export interface Tariff {
   id: string;
   name: string;
-  price: number;
-  period: 'monthly' | 'yearly' | 'weekly' | 'daily';
   description: string;
+  price: number;
+  period: "monthly" | "yearly";
   features: string[];
   isPopular: boolean;
   isActive: boolean;
+  billingPeriod: string;
   storeLimit: number;
 }
 
-// Исходные данные о тарифах
+// Initial tariffs data - will be used as fallback if database fetch fails
 export const initialTariffs: Tariff[] = [
   {
-    id: '1',
-    name: 'Базовый',
-    price: 990,
-    period: 'monthly',
-    description: 'Идеально для начинающих продавцов',
+    id: "1",
+    name: "Базовый",
+    description: "Для небольших магазинов",
+    price: 1500,
+    period: "monthly",
+    billingPeriod: "Ежемесячно",
     features: [
-      'Доступ к основным отчетам',
-      'Управление до 100 товаров',
-      'Базовая аналитика',
-      'Email поддержка'
+      "Базовая аналитика",
+      "Подключение 1 магазина",
+      "Отчеты о продажах"
     ],
     isPopular: false,
     isActive: true,
-    storeLimit: 1
+    storeLimit: 1,
   },
   {
-    id: '2',
-    name: 'Профессиональный',
-    price: 1990,
-    period: 'monthly',
-    description: 'Для растущих магазинов',
+    id: "2",
+    name: "Профессиональный",
+    description: "Для растущих магазинов",
+    price: 3500,
+    period: "monthly",
+    billingPeriod: "Ежемесячно",
     features: [
-      'Все функции Базового тарифа',
-      'Управление до 1000 товаров',
-      'Расширенная аналитика',
-      'Приоритетная поддержка',
-      'API интеграции'
+      "Расширенная аналитика",
+      "Подключение до 3 магазинов",
+      "Отчеты о продажах",
+      "Аналитика конверсии",
+      "Оптимизация цен"
     ],
     isPopular: true,
     isActive: true,
-    storeLimit: 2
+    storeLimit: 3,
   },
   {
-    id: '3',
-    name: 'Бизнес',
-    price: 4990,
-    period: 'monthly',
-    description: 'Комплексное решение для крупных продавцов',
+    id: "3",
+    name: "Бизнес",
+    description: "Для профессиональных продавцов",
+    price: 7500,
+    period: "monthly",
+    billingPeriod: "Ежемесячно",
     features: [
-      'Все функции Профессионального тарифа',
-      'Неограниченное количество товаров',
-      'Персональный менеджер',
-      'Расширенный API доступ',
-      'Белая метка (White Label)',
-      'Приоритетные обновления'
+      "Полная аналитика",
+      "Подключение до 10 магазинов",
+      "Прогнозирование продаж",
+      "AI-рекомендации",
+      "Приоритетная поддержка"
     ],
     isPopular: false,
     isActive: true,
-    storeLimit: 10
-  }
+    storeLimit: 10,
+  },
+  {
+    id: "4",
+    name: "Корпоративный",
+    description: "Для крупных компаний",
+    price: 15000,
+    period: "monthly",
+    billingPeriod: "Ежемесячно",
+    features: [
+      "Полная аналитика",
+      "Подключение неограниченного числа магазинов",
+      "Прогнозирование продаж",
+      "AI-рекомендации",
+      "Персональный менеджер",
+      "API доступ",
+      "Интеграция с ERP"
+    ],
+    isPopular: false,
+    isActive: true,
+    storeLimit: 999,
+  },
 ];
 
-// Константы для локального хранения
-export const TARIFFS_STORAGE_KEY = "app_tariffs";
-
-// Функция для загрузки тарифов (из Supabase или локального хранилища)
-export const loadTariffs = async (): Promise<Tariff[]> => {
+// Function to fetch tariffs from Supabase
+export const fetchTariffs = async (): Promise<Tariff[]> => {
   try {
-    // Импортируем клиент Supabase
-    const { supabase } = await import('@/integrations/supabase/client');
-    
-    // Пытаемся получить тарифы из Supabase
     const { data, error } = await supabase
       .from('tariffs')
       .select('*');
-      
+    
     if (error) {
-      console.warn('Ошибка при загрузке тарифов из Supabase:', error);
-      throw error;
+      console.error('Error fetching tariffs:', error);
+      return initialTariffs;
     }
     
-    if (data && data.length > 0) {
-      return data as Tariff[];
+    if (!data || data.length === 0) {
+      return initialTariffs;
     }
     
-    // Если в Supabase нет тарифов, пробуем взять их из localStorage
-    const savedTariffs = localStorage.getItem(TARIFFS_STORAGE_KEY);
-    if (savedTariffs) {
-      try {
-        return JSON.parse(savedTariffs);
-      } catch (e) {
-        console.error('Ошибка при парсинге тарифов из localStorage:', e);
-      }
-    }
-    
-    // Если и в Supabase и localStorage нет данных, возвращаем исходные тарифы
-    return initialTariffs;
+    // Map the database fields to our Tariff interface
+    return data.map(tariff => ({
+      id: tariff.id,
+      name: tariff.name,
+      description: tariff.description || '',
+      price: parseFloat(tariff.price),
+      period: tariff.period as "monthly" | "yearly",
+      features: Array.isArray(tariff.features) ? tariff.features : [],
+      isPopular: !!tariff.is_popular,
+      isActive: !!tariff.is_active,
+      billingPeriod: tariff.billing_period || (tariff.period === 'monthly' ? 'Ежемесячно' : 'Ежегодно'),
+      storeLimit: tariff.store_limit || 1
+    }));
   } catch (error) {
-    console.warn('Ошибка при загрузке тарифов:', error);
-    
-    // Пробуем загрузить из localStorage если Supabase недоступен
-    const savedTariffs = localStorage.getItem(TARIFFS_STORAGE_KEY);
-    if (savedTariffs) {
-      try {
-        return JSON.parse(savedTariffs);
-      } catch (e) {
-        console.error('Ошибка при парсинге тарифов из localStorage:', e);
-      }
-    }
-    
-    // Если и localStorage пуст или некорректен, возвращаем начальные данные
+    console.error('Error in fetchTariffs:', error);
     return initialTariffs;
   }
 };
 
-// Функция для сохранения тарифов (в Supabase и локальном хранилище)
-export const saveTariffs = async (tariffs: Tariff[]): Promise<boolean> => {
+// Function to update a tariff in Supabase
+export const updateTariff = async (tariff: Tariff): Promise<boolean> => {
   try {
-    // Импортируем клиент Supabase
-    const { supabase } = await import('@/integrations/supabase/client');
-    
-    // Сохраняем в localStorage в любом случае
-    localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
-    
-    // Удаляем существующие тарифы в Supabase
-    await supabase.from('tariffs').delete().gte('id', '0');
-    
-    // Добавляем новые тарифы
-    const { error } = await supabase.from('tariffs').insert(tariffs);
+    const { error } = await supabase
+      .from('tariffs')
+      .update({
+        name: tariff.name,
+        description: tariff.description,
+        price: tariff.price,
+        period: tariff.period,
+        features: tariff.features,
+        is_popular: tariff.isPopular,
+        is_active: tariff.isActive,
+        store_limit: tariff.storeLimit,
+        billing_period: tariff.billingPeriod
+      })
+      .eq('id', tariff.id);
     
     if (error) {
-      console.error('Ошибка при сохранении тарифов в Supabase:', error);
+      console.error('Error updating tariff:', error);
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Ошибка при сохранении тарифов:', error);
-    
-    // Сохраняем в localStorage даже при ошибке с Supabase
-    localStorage.setItem(TARIFFS_STORAGE_KEY, JSON.stringify(tariffs));
+    console.error('Error in updateTariff:', error);
     return false;
   }
 };
 
-// Функция для получения тарифа по ID
-export const getTariffById = async (tariffId: string): Promise<Tariff | undefined> => {
-  const tariffs = await loadTariffs();
-  return tariffs.find(tariff => tariff.id === tariffId);
-};
-
-// Функция для обработки окончания пробного периода
-export const handleTrialExpiration = (userData: any): any => {
-  // Проверяем, был ли у пользователя пробный период и закончился ли он
-  if (userData.isInTrial && new Date(userData.trialEndDate) < new Date()) {
-    // После окончания пробного периода переводим на базовый тариф
-    const updatedUserData = {
-      ...userData,
-      isInTrial: false,
-      tariffId: "1", // Базовый тариф
-      isSubscriptionActive: false
-    };
+// Function to create a new tariff in Supabase
+export const createTariff = async (tariff: Omit<Tariff, 'id'>): Promise<Tariff | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('tariffs')
+      .insert({
+        name: tariff.name,
+        description: tariff.description,
+        price: tariff.price,
+        period: tariff.period,
+        features: tariff.features,
+        is_popular: tariff.isPopular,
+        is_active: tariff.isActive,
+        store_limit: tariff.storeLimit,
+        billing_period: tariff.billingPeriod
+      })
+      .select();
     
-    // Сохраняем обновленные данные пользователя
-    localStorage.setItem('user', JSON.stringify(updatedUserData));
-    return updatedUserData;
+    if (error) {
+      console.error('Error creating tariff:', error);
+      return null;
+    }
+    
+    if (!data || data.length === 0) {
+      return null;
+    }
+    
+    // Return the newly created tariff
+    return {
+      id: data[0].id,
+      name: data[0].name,
+      description: data[0].description || '',
+      price: parseFloat(data[0].price),
+      period: data[0].period as "monthly" | "yearly",
+      features: Array.isArray(data[0].features) ? data[0].features : [],
+      isPopular: !!data[0].is_popular,
+      isActive: !!data[0].is_active,
+      billingPeriod: data[0].billing_period || (data[0].period === 'monthly' ? 'Ежемесячно' : 'Ежегодно'),
+      storeLimit: data[0].store_limit || 1
+    };
+  } catch (error) {
+    console.error('Error in createTariff:', error);
+    return null;
   }
-  
-  return userData;
 };
 
-// Функция для проверки и применения ограничений тарифа
-export const applyTariffRestrictions = (tariffId: string): { 
-  storeLimit: number,
-  canUseAIAnalysis: boolean,
-  canUseAdvancedReports: boolean,
-  canUseAPIIntegrations: boolean
-} => {
-  const restrictions = {
-    storeLimit: 1,
-    canUseAIAnalysis: false,
-    canUseAdvancedReports: false,
-    canUseAPIIntegrations: false
-  };
-  
-  switch (tariffId) {
-    case "1": // Базовый
-      restrictions.storeLimit = 1;
-      restrictions.canUseAIAnalysis = false;
-      restrictions.canUseAdvancedReports = false;
-      restrictions.canUseAPIIntegrations = false;
-      break;
-    case "2": // Профессиональный
-      restrictions.storeLimit = 2;
-      restrictions.canUseAIAnalysis = false;
-      restrictions.canUseAdvancedReports = true;
-      restrictions.canUseAPIIntegrations = true;
-      break;
-    case "3": // Бизнес
-      restrictions.storeLimit = 10;
-      restrictions.canUseAIAnalysis = true;
-      restrictions.canUseAdvancedReports = true;
-      restrictions.canUseAPIIntegrations = true;
-      break;
-    case "4": // Корпоративный (если такой есть)
-      restrictions.storeLimit = 999; // Практически без ограничений
-      restrictions.canUseAIAnalysis = true;
-      restrictions.canUseAdvancedReports = true;
-      restrictions.canUseAPIIntegrations = true;
-      break;
-    default:
-      // По умолчанию базовый тариф
-      restrictions.storeLimit = 1;
+// Function to delete a tariff from Supabase
+export const deleteTariff = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('tariffs')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting tariff:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in deleteTariff:', error);
+    return false;
   }
-  
-  return restrictions;
 };

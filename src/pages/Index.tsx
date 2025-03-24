@@ -1,195 +1,160 @@
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useNavigate } from "react-router-dom";
-import Chart from "@/components/Chart";
-import ProductsComponent from "@/components/Products";
-import Stores from "@/components/Stores";
-import ProductsList from "@/components/ProductsList";
-import Profile from "@/components/Profile";
-import Warehouses from "@/pages/Warehouses";
-import Advertising from "@/components/Advertising";
+import React, { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MainLayout from "@/components/layout/MainLayout";
-import AnalyticsSection from "@/components/analytics/AnalyticsSection";
 import Dashboard from "@/components/dashboard/Dashboard";
-import { getProductProfitabilityData, getSelectedStore } from "@/utils/storeUtils";
-import { User, hasFeatureAccess, getTrialDaysRemaining } from "@/services/userService";
-import { useToast } from "@/hooks/use-toast";
+import OrdersAnalytics from "@/components/dashboard/OrdersAnalytics";
+import SalesAnalytics from "@/components/dashboard/SalesAnalytics";
+import GeographySection from "@/components/dashboard/GeographySection";
+import WarehouseEfficiencyChart from "@/components/dashboard/WarehouseEfficiencyChart";
+import TipsSection from "@/components/dashboard/TipsSection";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import SubscriptionExpiredAlert from "@/components/subscription/SubscriptionExpiredAlert";
+import { hasFeatureAccess } from "@/services/userService";
+import { PlusCircle } from "lucide-react";
 
 const Index = () => {
+  const [userData, setUserData] = useState(null);
+  const [isLimited, setIsLimited] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
-  const isMobile = useIsMobile();
-  const [selectedStore, setSelectedStore] = useState<{id: string; apiKey: string} | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [hasAccess, setHasAccess] = useState(false);
-  const [trialDaysLeft, setTrialDaysLeft] = useState(0);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is authenticated - проверяем и localStorage, и sessionStorage
-    const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
-    
-    if (!storedUser) {
-      // User is not authenticated, redirect to landing page
-      toast({
-        title: "Доступ запрещен",
-        description: "Пожалуйста, войдите в систему для доступа к дашборду",
-        variant: "destructive"
-      });
-      navigate('/', { replace: true });
-      return;
-    }
-    
-    // User is authenticated, set user data
-    const parsedUser = JSON.parse(storedUser);
-    setUser(parsedUser);
-    
-    // Check if user has access (trial or active subscription)
-    const access = hasFeatureAccess(parsedUser);
-    setHasAccess(access);
-    
-    // Calculate trial days if in trial
-    if (parsedUser.isInTrial) {
-      setTrialDaysLeft(getTrialDaysRemaining(parsedUser));
-    }
-    
-    // Initialize selected store
-    const store = getSelectedStore();
-    if (store) {
-      setSelectedStore(store);
+    // Загрузка данных пользователя
+    const userJson = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (userJson) {
+      try {
+        const user = JSON.parse(userJson);
+        setUserData(user);
+        // Проверка доступа к функциям
+        const canAccessAdvancedMetrics = hasFeatureAccess(user, 'advancedMetrics');
+        setIsLimited(!canAccessAdvancedMetrics);
+      } catch (error) {
+        console.error('Ошибка при парсинге данных пользователя:', error);
+      }
+    } else {
+      // Если пользователь не авторизован, перенаправляем на главную
+      navigate('/');
     }
   }, [navigate]);
 
-  const getProductsData = () => {
-    const store = selectedStore || getSelectedStore();
-    if (!store) return { profitable: [], unprofitable: [] };
-    
-    // Получаем данные о прибыльности товаров
-    const profitabilityData = getProductProfitabilityData(store.id);
-    if (profitabilityData && profitabilityData.profitableProducts && profitabilityData.unprofitableProducts) {
-      return {
-        profitable: profitabilityData.profitableProducts || [],
-        unprofitable: profitabilityData.unprofitableProducts || []
-      };
+  // Если данные пользователя еще не загружены, показываем загрузку
+  if (!userData) {
+    return (
+      <MainLayout 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        user={null}
+      >
+        <div className="container mx-auto py-10 flex justify-center items-center h-[80vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Функция для обработки создания нового магазина
+  const handleCreateStore = () => {
+    if (hasFeatureAccess(userData, 'createStore')) {
+      navigate('/stores');
+    } else {
+      // Если у пользователя нет доступа к созданию магазина, показываем сообщение
+      console.log('Недостаточно прав для создания магазина');
     }
-    
-    return { profitable: [], unprofitable: [] };
   };
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
+  // Mock data for components that need it
+  const mockOrders = {
+    data: [],
+    isLoading: false,
+    totalOrders: 0,
+    totalItems: 0,
+    averageOrderValue: 0
   };
 
-  const handleUserUpdated = (updatedUser: User) => {
-    setUser(updatedUser);
-    // Re-check access with updated user data
-    setHasAccess(hasFeatureAccess(updatedUser));
-    
-    if (updatedUser.isInTrial) {
-      setTrialDaysLeft(getTrialDaysRemaining(updatedUser));
-    }
-    
-    // Save updated user to storage
-    const storage = sessionStorage.getItem('user') ? sessionStorage : localStorage;
-    storage.setItem('user', JSON.stringify(updatedUser));
+  const mockWarehouseData = {
+    labels: ['Склад 1', 'Склад 2', 'Склад 3', 'Склад 4'],
+    data: [85, 70, 92, 65],
+    isLoading: false
   };
 
-  const renderContent = () => {
-    // If user doesn't have access (trial expired and no subscription)
-    if (!hasAccess) {
-      return <SubscriptionExpiredAlert user={user} onUserUpdated={handleUserUpdated} />;
-    }
-    
-    const { profitable, unprofitable } = getProductsData();
-    
-    switch (activeTab) {
-      case "home":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className={isMobile ? 'space-y-4' : 'space-y-6'}
-          >
-            <Dashboard />
-          </motion.div>
-        );
-      case "analytics":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <AnalyticsSection />
-          </motion.div>
-        );
-      case "products":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <ProductsList selectedStore={selectedStore} />
-          </motion.div>
-        );
-      case "stores":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Stores onStoreSelect={setSelectedStore} />
-          </motion.div>
-        );
-      case "warehouses":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Warehouses />
-          </motion.div>
-        );
-      case "advertising":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Advertising selectedStore={selectedStore} />
-          </motion.div>
-        );
-      case "profile":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Profile user={user} onUserUpdated={handleUserUpdated} />
-          </motion.div>
-        );
-      default:
-        return null;
-    }
+  const mockDistribution = {
+    regions: [],
+    warehouses: []
   };
 
   return (
     <MainLayout 
       activeTab={activeTab} 
-      onTabChange={handleTabChange} 
-      user={user}
-      trialDaysLeft={trialDaysLeft}
+      onTabChange={setActiveTab}
+      user={userData}
     >
-      {renderContent()}
+      <div className="container mx-auto py-10">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold mb-2">Дашборд</h1>
+            <p className="text-muted-foreground">Аналитика и основные показатели вашего бизнеса</p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4 md:mt-0">
+            <Button
+              variant="default"
+              onClick={handleCreateStore}
+              className="bg-blue-600 hover:bg-blue-700 gap-1"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Подключить магазин</span>
+            </Button>
+          </div>
+        </div>
+
+        {userData && userData.isSubscriptionActive === false && !userData.isInTrial && (
+          <SubscriptionExpiredAlert
+            user={userData}
+            onUserUpdated={(updatedUser) => setUserData(updatedUser)}
+          />
+        )}
+
+        <div className="space-y-8">
+          <Dashboard />
+          
+          <Tabs defaultValue="orders" className="mt-8">
+            <TabsList>
+              <TabsTrigger value="orders">Заказы</TabsTrigger>
+              <TabsTrigger value="sales">Продажи</TabsTrigger>
+              <TabsTrigger value="geography">География</TabsTrigger>
+              <TabsTrigger value="warehouse">Склады</TabsTrigger>
+            </TabsList>
+            <TabsContent value="orders">
+              <OrdersAnalytics orders={mockOrders} />
+            </TabsContent>
+            <TabsContent value="sales">
+              <SalesAnalytics isLimited={isLimited} />
+            </TabsContent>
+            <TabsContent value="geography">
+              <GeographySection 
+                warehouseDistribution={mockDistribution.warehouses} 
+                regionDistribution={mockDistribution.regions} 
+              />
+            </TabsContent>
+            <TabsContent value="warehouse">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Эффективность складов</CardTitle>
+                  <CardDescription>Анализ эффективности работы различных складов</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <WarehouseEfficiencyChart data={mockWarehouseData} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+          
+          <TipsSection />
+        </div>
+      </div>
     </MainLayout>
   );
 };
