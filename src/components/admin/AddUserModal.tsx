@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { User } from "@/services/userService";
+import { addUser, User } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -21,24 +21,6 @@ interface AddUserModalProps {
   onClose: () => void;
   onUserAdded: (user: User) => void;
 }
-
-// Имитация функции добавления пользователя
-const addUser = async (userData: Partial<User>): Promise<User> => {
-  // В реальном приложении здесь был бы запрос к API
-  return {
-    id: Math.random().toString(36).substring(2, 9),
-    name: userData.name || "",
-    email: userData.email || "",
-    avatar: userData.avatar || "",
-    role: userData.role || "user",
-    status: userData.status || "active",
-    registeredAt: userData.registeredAt || new Date().toISOString(),
-    isInTrial: false,
-    trialEndDate: "",
-    isSubscriptionActive: false,
-    tariffId: "1"
-  };
-};
 
 export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserModalProps) {
   const [formData, setFormData] = useState({
@@ -74,9 +56,7 @@ export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserMo
     
     try {
       const newUser = await addUser({
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
+        ...formData,
         status: "active",
         registeredAt: new Date().toISOString(),
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name.replace(/\s+/g, '')}`

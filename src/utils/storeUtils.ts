@@ -1,347 +1,702 @@
-
+import { Store, STORES_STORAGE_KEY, STATS_STORAGE_KEY, ORDERS_STORAGE_KEY, SALES_STORAGE_KEY, WildberriesOrder, WildberriesSale } from "@/types/store";
+import { fetchWildberriesStats, fetchWildberriesOrders, fetchWildberriesSales } from "@/services/wildberriesApi";
 import { applyTariffRestrictions } from "@/data/tariffs";
+import axios from "axios";
+// We need to add this for TypeScript
+import type { PostgrestSingleResponse } from '@supabase/supabase-js';
 
-// Типы данных
-interface Store {
-  id: string;
-  apiKey: string;
-  name: string;
-  marketplace: string;
-}
-
-interface User {
-  id: string;
-  tariffId: string;
-}
-
-interface ProductProfitability {
-  profitableProducts: any[];
-  unprofitableProducts: any[];
-  updateDate?: string;
-}
-
-// Получить хранилище на основе типа авторизации
-function getStorage(): Storage {
-  // Если пользователь залогинен через "Запомнить меня", данные в localStorage
-  if (localStorage.getItem('user')) {
-    return localStorage;
-  }
-  // Иначе данные в sessionStorage
-  return sessionStorage;
-}
-
-// Получить выбранный магазин
-export function getSelectedStore(): { id: string; apiKey: string; name?: string; marketplace?: string } | null {
-  const storage = getStorage();
-  const selectedStoreJSON = storage.getItem('selectedStore');
-  
-  if (!selectedStoreJSON) {
-    return null;
-  }
-  
-  try {
-    return JSON.parse(selectedStoreJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных выбранного магазина:', e);
-    return null;
-  }
-}
-
-// Установить выбранный магазин
-export function setSelectedStore(store: Store): void {
-  const storage = getStorage();
-  storage.setItem('selectedStore', JSON.stringify({
-    id: store.id,
-    apiKey: store.apiKey,
-    name: store.name,
-    marketplace: store.marketplace
-  }));
-}
-
-// Удалить выбранный магазин
-export function clearSelectedStore(): void {
-  const storage = getStorage();
-  storage.removeItem('selectedStore');
-}
-
-// Получить список магазинов пользователя
-export function getUserStores(): Store[] {
-  const storage = getStorage();
-  const storesJSON = storage.getItem('userStores');
-  
-  if (!storesJSON) {
-    return [];
-  }
-  
-  try {
-    return JSON.parse(storesJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных магазинов пользователя:', e);
-    return [];
-  }
-}
-
-// Сохранить список магазинов пользователя
-export function saveUserStores(stores: Store[]): void {
-  const storage = getStorage();
-  storage.setItem('userStores', JSON.stringify(stores));
-}
-
-// Добавить новый магазин
-export function addUserStore(store: Store): Store[] {
-  const stores = getUserStores();
-  const updatedStores = [...stores, store];
-  saveUserStores(updatedStores);
-  return updatedStores;
-}
-
-// Проверить, может ли пользователь добавить еще один магазин
-export function canAddStore(userData: User): boolean {
-  const stores = getUserStores();
-  const restrictions = applyTariffRestrictions(userData.tariffId);
-  
-  return stores.length < restrictions.storeLimit;
-}
-
-// Получить лимит магазинов для пользователя
-export function getStoreLimit(userData: User): number {
-  const restrictions = applyTariffRestrictions(userData.tariffId);
-  return restrictions.storeLimit;
-}
-
-// Удалить магазин
-export function removeUserStore(storeId: string): Store[] {
-  const stores = getUserStores();
-  const updatedStores = stores.filter(store => store.id !== storeId);
-  saveUserStores(updatedStores);
-  
-  // Если удаляемый магазин был выбран, сбрасываем выбор
-  const selectedStore = getSelectedStore();
-  if (selectedStore && selectedStore.id === storeId) {
-    clearSelectedStore();
-  }
-  
-  return updatedStores;
-}
-
-// Сохранить данные о прибыльности товаров
-export function saveProductProfitabilityData(storeId: string, data: ProductProfitability): void {
-  const storage = getStorage();
-  storage.setItem(`profitability_${storeId}`, JSON.stringify({
-    ...data,
-    updateDate: new Date().toISOString()
-  }));
-}
-
-// Получить данные о прибыльности товаров
-export function getProductProfitabilityData(storeId: string): ProductProfitability | null {
-  const storage = getStorage();
-  const dataJSON = storage.getItem(`profitability_${storeId}`);
-  
-  if (!dataJSON) {
-    return null;
-  }
-  
-  try {
-    return JSON.parse(dataJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных о прибыльности товаров:', e);
-    return null;
-  }
-}
-
-// Сохранить данные о себестоимости товаров
-export function saveCostPriceData(storeId: string, data: any): void {
-  const storage = getStorage();
-  storage.setItem(`costprice_${storeId}`, JSON.stringify(data));
-}
-
-// Получить данные о себестоимости товаров
-export function getCostPriceData(storeId: string): any | null {
-  const storage = getStorage();
-  const dataJSON = storage.getItem(`costprice_${storeId}`);
-  
-  if (!dataJSON) {
-    return null;
-  }
-  
-  try {
-    return JSON.parse(dataJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных о себестоимости товаров:', e);
-    return null;
-  }
-}
-
-// Загрузить магазины
-export function loadStores(): Store[] {
-  return getUserStores();
-}
-
-// Сохранить магазины
-export function saveStores(stores: Store[]): void {
-  saveUserStores(stores);
-}
-
-// Проверить API ключ
-export function validateApiKey(apiKey: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    // Для демо считаем ключ валидным, если он не пустой и длиннее 8 символов
-    setTimeout(() => {
-      resolve(apiKey && apiKey.length > 8);
-    }, 1000);
-  });
-}
-
-// Получить данные о заказах
-export function getOrdersData(storeId: string): any[] {
-  const storage = getStorage();
-  const dataJSON = storage.getItem(`orders_${storeId}`);
-  
-  if (!dataJSON) {
-    return [];
-  }
-  
-  try {
-    return JSON.parse(dataJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных о заказах:', e);
-    return [];
-  }
-}
-
-// Получить данные о продажах
-export function getSalesData(storeId: string): any[] {
-  const storage = getStorage();
-  const dataJSON = storage.getItem(`sales_${storeId}`);
-  
-  if (!dataJSON) {
-    return [];
-  }
-  
-  try {
-    return JSON.parse(dataJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных о продажах:', e);
-    return [];
-  }
-}
-
-// Получить данные аналитики
-export function getAnalyticsData(storeId: string): any {
-  const storage = getStorage();
-  const dataJSON = storage.getItem(`analytics_${storeId}`);
-  
-  if (!dataJSON) {
-    return null;
-  }
-  
-  try {
-    return JSON.parse(dataJSON);
-  } catch (e) {
-    console.error('Ошибка при парсинге данных аналитики:', e);
-    return null;
-  }
-}
-
-// Обновить данные о заказах
-export function fetchAndUpdateOrders(storeId: string, apiKey: string): Promise<any[]> {
-  return new Promise((resolve) => {
-    // Генерируем демо-данные
-    setTimeout(() => {
-      const orders = generateDemoOrders();
-      const storage = getStorage();
-      storage.setItem(`orders_${storeId}`, JSON.stringify(orders));
-      resolve(orders);
-    }, 1500);
-  });
-}
-
-// Обновить данные о продажах
-export function fetchAndUpdateSales(storeId: string, apiKey: string): Promise<any[]> {
-  return new Promise((resolve) => {
-    // Генерируем демо-данные
-    setTimeout(() => {
-      const sales = generateDemoSales();
-      const storage = getStorage();
-      storage.setItem(`sales_${storeId}`, JSON.stringify(sales));
-      resolve(sales);
-    }, 1500);
-  });
-}
-
-// Генерировать демо-данные о заказах
-function generateDemoOrders(): any[] {
-  const orders = [];
+export const getLastWeekDateRange = () => {
   const now = new Date();
-  
-  for (let i = 0; i < 50; i++) {
-    const date = new Date();
-    date.setDate(now.getDate() - Math.floor(Math.random() * 30));
-    
-    orders.push({
-      id: `ORDER-${1000 + i}`,
-      date: date.toISOString(),
-      customer: `Customer ${i + 1}`,
-      total: Math.floor(Math.random() * 10000) + 1000,
-      status: ['new', 'processing', 'shipped', 'delivered', 'cancelled'][Math.floor(Math.random() * 5)],
-      items: Math.floor(Math.random() * 5) + 1
-    });
-  }
-  
-  return orders;
-}
+  const lastWeek = new Date(now);
+  lastWeek.setDate(now.getDate() - 7);
+  return { from: lastWeek, to: now };
+};
 
-// Генерировать демо-данные о продажах
-function generateDemoSales(): any[] {
-  const sales = [];
-  const now = new Date();
-  
-  for (let i = 0; i < 100; i++) {
-    const date = new Date();
-    date.setDate(now.getDate() - Math.floor(Math.random() * 30));
-    
-    sales.push({
-      id: `SALE-${1000 + i}`,
-      date: date.toISOString(),
-      product: `Product ${i % 20 + 1}`,
-      quantity: Math.floor(Math.random() * 5) + 1,
-      price: Math.floor(Math.random() * 5000) + 500,
-      total: Math.floor(Math.random() * 10000) + 1000
-    });
-  }
-  
-  return sales;
-}
+export const loadStores = (): Store[] => {
+  const savedStores = localStorage.getItem(STORES_STORAGE_KEY);
+  return savedStores ? JSON.parse(savedStores) : [];
+};
 
-// Обеспечить сохранение выбранного магазина
-export function ensureStoreSelectionPersistence(): void {
-  const stores = getUserStores();
-  const selectedStore = getSelectedStore();
+export const saveStores = (stores: Store[]): void => {
+  const storesWithTimestamp = {
+    stores,
+    timestamp: new Date().toISOString()
+  };
+  localStorage.setItem(STORES_STORAGE_KEY, JSON.stringify(stores));
+  localStorage.setItem(`${STORES_STORAGE_KEY}_timestamp`, Date.now().toString());
   
-  // Если есть выбранный магазин, проверяем его существование
+  const selectedStore = stores.find(s => s.isSelected);
   if (selectedStore) {
-    const storeExists = stores.some(store => store.id === selectedStore.id);
-    
-    // Если магазин больше не существует, сбрасываем выбор
-    if (!storeExists) {
-      clearSelectedStore();
+    localStorage.setItem('last_selected_store', JSON.stringify({
+      storeId: selectedStore.id,
+      timestamp: Date.now()
+    }));
+  }
+  
+  window.dispatchEvent(new CustomEvent('stores-updated', { 
+    detail: { stores, timestamp: Date.now() } 
+  }));
+};
+
+export const refreshStoreStats = async (store: Store): Promise<Store | null> => {
+  if (store.marketplace === "Wildberries") {
+    try {
+      const { from, to } = getLastWeekDateRange();
+      const stats = await fetchWildberriesStats(store.apiKey, from, to);
+      if (stats) {
+        const updatedStore = { 
+          ...store, 
+          stats,
+          lastFetchDate: new Date().toISOString() 
+        };
+        
+        const deductionsTimeline = stats.dailySales?.map((day: any) => {
+          const daysCount = stats.dailySales.length || 1;
+          const logistic = (stats.currentPeriod.expenses.logistics || 0) / daysCount;
+          const storage = (stats.currentPeriod.expenses.storage || 0) / daysCount;
+          const penalties = (stats.currentPeriod.expenses.penalties || 0) / daysCount;
+          const acceptance = (stats.currentPeriod.expenses.acceptance || 0) / daysCount;
+          const advertising = (stats.currentPeriod.expenses.advertising || 0) / daysCount;
+          const deductions = (stats.currentPeriod.expenses.deductions || 0) / daysCount;
+          
+          return {
+            date: typeof day.date === 'string' ? day.date.split('T')[0] : new Date().toISOString().split('T')[0],
+            logistic,
+            storage,
+            penalties,
+            acceptance,
+            advertising,
+            deductions
+          };
+        }) || [];
+        
+        const analyticsData = {
+          storeId: store.id,
+          dateFrom: from.toISOString(),
+          dateTo: to.toISOString(),
+          data: stats,
+          penalties: [],
+          returns: [],
+          deductions: [],
+          deductionsTimeline,
+          productAdvertisingData: [],
+          advertisingBreakdown: { search: 0 },
+          timestamp: Date.now()
+        };
+        
+        try {
+          await axios.post('http://localhost:3001/api/store-stats', {
+            storeId: store.id,
+            dateFrom: from.toISOString(),
+            dateTo: to.toISOString(),
+            data: stats
+          });
+          
+          await axios.post('http://localhost:3001/api/analytics', analyticsData);
+        } catch (error) {
+          console.error('Error saving stats to DB:', error);
+          localStorage.setItem(`marketplace_analytics_${store.id}`, JSON.stringify(analyticsData));
+        }
+        
+        return updatedStore;
+      }
+    } catch (error) {
+      console.error('Error refreshing stats:', error);
+      return store;
     }
   }
-  // Если нет выбранного магазина, но есть магазины, выбираем первый
-  else if (stores.length > 0) {
-    setSelectedStore(stores[0]);
-  }
-}
+  return store;
+};
 
-// Обновить статистику магазина
-export function refreshStoreStats(storeId: string, apiKey: string): Promise<void> {
-  return new Promise((resolve) => {
-    Promise.all([
-      fetchAndUpdateOrders(storeId, apiKey),
-      fetchAndUpdateSales(storeId, apiKey)
-    ]).then(() => {
-      resolve();
+export const getOrdersData = async (storeId: string) => {
+  try {
+    const response = await axios.get(`http://localhost:3001/api/orders/${storeId}`);
+    if (response.data) {
+      return {
+        orders: response.data.orders,
+        warehouseDistribution: response.data.warehouse_distribution,
+        regionDistribution: response.data.region_distribution
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching orders from DB:', error);
+    const storedData = localStorage.getItem(`${ORDERS_STORAGE_KEY}_${storeId}`);
+    if (storedData) {
+      return JSON.parse(storedData);
+    }
+  }
+  return null;
+};
+
+export const getSalesData = async (storeId: string) => {
+  try {
+    const response = await axios.get(`http://localhost:3001/api/sales/${storeId}`);
+    if (response.data) {
+      return {
+        sales: response.data.sales
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching sales from DB:', error);
+    const storedData = localStorage.getItem(`${SALES_STORAGE_KEY}_${storeId}`);
+    if (storedData) {
+      return JSON.parse(storedData);
+    }
+  }
+  return null;
+};
+
+export const fetchAndUpdateOrders = async (store: Store) => {
+  if (store.marketplace === "Wildberries") {
+    try {
+      const { from } = getLastWeekDateRange();
+      const orders = await fetchWildberriesOrders(store.apiKey, from);
+      
+      if (orders && orders.length > 0) {
+        const warehouseCounts: Record<string, number> = {};
+        const totalOrders = orders.length;
+        
+        orders.forEach(order => {
+          if (order.warehouseName) {
+            warehouseCounts[order.warehouseName] = (warehouseCounts[order.warehouseName] || 0) + 1;
+          }
+        });
+        
+        const warehouseDistribution = Object.entries(warehouseCounts)
+          .map(([name, count]) => ({
+            name,
+            count,
+            percentage: (count / totalOrders) * 100
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        
+        const regionCounts: Record<string, number> = {};
+        
+        orders.forEach(order => {
+          if (order.regionName) {
+            regionCounts[order.regionName] = (regionCounts[order.regionName] || 0) + 1;
+          }
+        });
+        
+        const regionDistribution = Object.entries(regionCounts)
+          .map(([name, count]) => ({
+            name,
+            count,
+            percentage: (count / totalOrders) * 100
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        
+        const ordersData = {
+          storeId: store.id,
+          dateFrom: from.toISOString(),
+          dateTo: new Date().toISOString(),
+          orders,
+          warehouseDistribution,
+          regionDistribution,
+          timestamp: Date.now()
+        };
+        
+        try {
+          await axios.post('http://localhost:3001/api/orders', ordersData);
+        } catch (error) {
+          console.error('Error saving orders to DB:', error);
+          localStorage.setItem(`${ORDERS_STORAGE_KEY}_${store.id}`, JSON.stringify(ordersData));
+        }
+        
+        return {
+          orders,
+          warehouseDistribution,
+          regionDistribution
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  }
+  return null;
+};
+
+export const fetchAndUpdateSales = async (store: Store) => {
+  if (store.marketplace === "Wildberries") {
+    try {
+      const { from } = getLastWeekDateRange();
+      const sales = await fetchWildberriesSales(store.apiKey, from);
+      
+      if (sales && sales.length > 0) {
+        const salesData = {
+          storeId: store.id,
+          dateFrom: from.toISOString(),
+          dateTo: new Date().toISOString(),
+          sales,
+          timestamp: Date.now()
+        };
+        
+        try {
+          await axios.post('http://localhost:3001/api/sales', salesData);
+        } catch (error) {
+          console.error('Error saving sales to DB:', error);
+          localStorage.setItem(`${SALES_STORAGE_KEY}_${store.id}`, JSON.stringify(salesData));
+        }
+        
+        return sales;
+      }
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+    }
+  }
+  return null;
+};
+
+export const getProductProfitabilityData = (storeId: string) => {
+  try {
+    try {
+      const storedData = localStorage.getItem(`products_detailed_${storeId}`);
+      if (storedData) {
+        const parsedData = JSON.parse(storedData);
+        return {
+          profitableProducts: parsedData.profitableProducts?.slice(0, 3) || [],
+          unprofitableProducts: parsedData.unprofitableProducts?.slice(0, 3) || [],
+          updateDate: parsedData.updateDate
+        };
+      }
+      
+      const analyticsData = localStorage.getItem(`marketplace_analytics_${storeId}`);
+      if (analyticsData) {
+        const parsedData = JSON.parse(analyticsData);
+        return {
+          profitableProducts: (parsedData.data.topProfitableProducts || []).slice(0, 3),
+          unprofitableProducts: (parsedData.data.topUnprofitableProducts || []).slice(0, 3),
+          updateDate: parsedData.dateTo
+        };
+      }
+    } catch (innerError) {
+      console.error('Error parsing local storage data:', innerError);
+    }
+    
+    axios.get(`http://localhost:3001/api/analytics/${storeId}`)
+      .then(response => {
+        if (response.data && response.data.data) {
+          const data = {
+            profitableProducts: response.data.data.topProfitableProducts?.slice(0, 3) || [],
+            unprofitableProducts: response.data.data.topUnprofitableProducts?.slice(0, 3) || [],
+            updateDate: response.data.date_to
+          };
+          localStorage.setItem(`products_detailed_${storeId}`, JSON.stringify(data));
+          return data;
+        }
+        return null;
+      })
+      .catch(error => {
+        console.error('Error fetching product profitability data from DB:', error);
+        return null;
+      });
+  } catch (error) {
+    console.error('Error in getProductProfitabilityData:', error);
+  }
+  
+  return {
+    profitableProducts: [],
+    unprofitableProducts: [],
+    updateDate: null
+  };
+};
+
+export const getAnalyticsData = (storeId: string, forceRefresh?: boolean) => {
+  if (forceRefresh) {
+    console.log('Forced refresh requested, returning default structure');
+    return {
+      data: null,
+      penalties: [],
+      returns: [],
+      deductions: [],
+      deductionsTimeline: Array.from({ length: 7 }, (_, i) => ({
+        date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        logistic: 0,
+        storage: 0, 
+        penalties: 0,
+        acceptance: 0,
+        advertising: 0,
+        deductions: 0
+      })),
+      productAdvertisingData: [],
+      advertisingBreakdown: { search: 0 },
+      timestamp: Date.now()
+    };
+  }
+  
+  try {
+    try {
+      const key = `marketplace_analytics_${storeId}`;
+      const storedData = localStorage.getItem(key);
+      
+      if (storedData) {
+        let parsedData = JSON.parse(storedData);
+        
+        if (!parsedData.timestamp) {
+          parsedData.timestamp = Date.now();
+        }
+        
+        if (!parsedData.deductionsTimeline || !Array.isArray(parsedData.deductionsTimeline) || parsedData.deductionsTimeline.length === 0) {
+          console.log("Creating default deductionsTimeline data");
+          parsedData.deductionsTimeline = Array.from({ length: 7 }, (_, i) => ({
+            date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            logistic: 0,
+            storage: 0, 
+            penalties: 0,
+            acceptance: 0,
+            advertising: 0,
+            deductions: 0
+          }));
+        } else {
+          parsedData.deductionsTimeline = parsedData.deductionsTimeline.map((item: any) => ({
+            date: item.date || new Date().toISOString().split('T')[0],
+            logistic: item.logistic || 0,
+            storage: item.storage || 0,
+            penalties: item.penalties || 0,
+            acceptance: item.acceptance || 0,
+            advertising: item.advertising || 0,
+            deductions: item.deductions || 0
+          }));
+        }
+        
+        if (!parsedData.penalties || !Array.isArray(parsedData.penalties)) {
+          parsedData.penalties = [];
+        }
+        
+        if (!parsedData.returns || !Array.isArray(parsedData.returns)) {
+          parsedData.returns = [];
+        }
+        
+        if (!parsedData.deductions || !Array.isArray(parsedData.deductions)) {
+          parsedData.deductions = [];
+        }
+        
+        if (!parsedData.productAdvertisingData || !Array.isArray(parsedData.productAdvertisingData)) {
+          parsedData.productAdvertisingData = [];
+        }
+        
+        if (!parsedData.advertisingBreakdown) {
+          parsedData.advertisingBreakdown = { search: 0 };
+        }
+        
+        if (parsedData.data && parsedData.data.currentPeriod && parsedData.data.currentPeriod.expenses) {
+          parsedData.data.currentPeriod.expenses.advertising = parsedData.data.currentPeriod.expenses.advertising || 0;
+          parsedData.data.currentPeriod.expenses.acceptance = parsedData.data.currentPeriod.expenses.acceptance || 0;
+          parsedData.data.currentPeriod.expenses.deductions = parsedData.data.currentPeriod.expenses.deductions || 0;
+        }
+        
+        return parsedData;
+      }
+    } catch (localError) {
+      console.error('Error parsing localStorage analytics data:', localError);
+    }
+    
+    axios.get(`http://localhost:3001/api/analytics/${storeId}`)
+      .then(response => {
+        if (response.data) {
+          const parsedData = {
+            data: response.data.data,
+            penalties: response.data.penalties || [],
+            returns: response.data.returns || [],
+            deductions: response.data.deductions || [],
+            deductionsTimeline: response.data.deductions_timeline || [],
+            productAdvertisingData: response.data.product_advertising_data || [],
+            advertisingBreakdown: response.data.advertising_breakdown || { search: 0 },
+            timestamp: response.data.timestamp
+          };
+          
+          if (!parsedData.deductionsTimeline || !Array.isArray(parsedData.deductionsTimeline) || parsedData.deductionsTimeline.length === 0) {
+            parsedData.deductionsTimeline = Array.from({ length: 7 }, (_, i) => ({
+              date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              logistic: 0,
+              storage: 0, 
+              penalties: 0,
+              acceptance: 0,
+              advertising: 0,
+              deductions: 0
+            }));
+          }
+          
+          localStorage.setItem(`marketplace_analytics_${storeId}`, JSON.stringify(parsedData));
+          return parsedData;
+        }
+        return null;
+      })
+      .catch(error => {
+        console.error('Error fetching analytics data from DB:', error);
+        return null;
+      });
+  } catch (error) {
+    console.error('Error in getAnalyticsData:', error);
+  }
+  
+  return {
+    data: null,
+    penalties: [],
+    returns: [],
+    deductions: [],
+    deductionsTimeline: Array.from({ length: 7 }, (_, i) => ({
+      date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      logistic: 0,
+      storage: 0, 
+      penalties: 0,
+      acceptance: 0,
+      advertising: 0,
+      deductions: 0
+    })),
+    productAdvertisingData: [],
+    advertisingBreakdown: { search: 0 },
+    timestamp: Date.now()
+  };
+};
+
+export const getStoresLastUpdateTime = (): number => {
+  const timestamp = localStorage.getItem(`${STORES_STORAGE_KEY}_timestamp`);
+  return timestamp ? parseInt(timestamp, 10) : 0;
+};
+
+export const ensureStoreSelectionPersistence = (): Store[] => {
+  const stores = loadStores();
+  
+  const userData = localStorage.getItem('user');
+  const currentUserId = userData ? JSON.parse(userData).id : null;
+  
+  const userStores = currentUserId 
+    ? stores.filter(store => store.userId === currentUserId) 
+    : stores;
+  
+  if (!userStores.length) return userStores;
+  
+  const hasSelectedStore = userStores.some(store => store.isSelected);
+  
+  if (!hasSelectedStore && userStores.length > 0) {
+    const lastSelectedStoreData = localStorage.getItem('last_selected_store');
+    
+    if (lastSelectedStoreData) {
+      try {
+        const { storeId } = JSON.parse(lastSelectedStoreData);
+        
+        const storeExists = userStores.some(store => store.id === storeId);
+        
+        if (storeExists) {
+          const updatedAllStores = stores.map(store => ({
+            ...store,
+            isSelected: store.id === storeId
+          }));
+          
+          saveStores(updatedAllStores);
+          
+          return currentUserId 
+            ? updatedAllStores.filter(store => store.userId === currentUserId)
+            : updatedAllStores;
+        }
+      } catch (error) {
+        console.error('Error restoring store selection:', error);
+      }
+    }
+    
+    const updatedAllStores = stores.map(store => {
+      if (currentUserId && store.userId === currentUserId) {
+        const isFirst = store.id === userStores[0].id;
+        return { ...store, isSelected: isFirst };
+      }
+      return { ...store, isSelected: false };
     });
-  });
-}
+    
+    saveStores(updatedAllStores);
+    
+    return currentUserId 
+      ? updatedAllStores.filter(store => store.userId === currentUserId)
+      : updatedAllStores;
+  }
+  
+  return userStores;
+};
+
+/**
+ * Gets the currently selected store without modifying any selections
+ * This is used to prevent unwanted reselection of stores
+ */
+export const getSelectedStore = (): Store | null => {
+  try {
+    const userData = localStorage.getItem('user');
+    const currentUserId = userData ? JSON.parse(userData).id : null;
+    
+    const stores = JSON.parse(localStorage.getItem(STORES_STORAGE_KEY) || '[]');
+    
+    const userStores = currentUserId 
+      ? stores.filter((store: Store) => store.userId === currentUserId)
+      : stores;
+    
+    return userStores.find((store: Store) => store.isSelected) || 
+           (userStores.length > 0 ? userStores[0] : null);
+  } catch (error) {
+    console.error('Error getting selected store:', error);
+    return null;
+  }
+};
+
+export const validateApiKey = async (apiKey: string): Promise<{ isValid: boolean; errorCode?: number; errorMessage?: string }> => {
+  try {
+    const { from, to } = getLastWeekDateRange();
+    const testFrom = new Date();
+    testFrom.setDate(testFrom.getDate() - 1);
+    
+    const url = "https://statistics-api.wildberries.ru/api/v1/supplier/sales";
+    const headers = {
+      "Authorization": apiKey,
+    };
+    const params = {
+      "dateFrom": testFrom.toISOString().split('T')[0] + 'T00:00:00'
+    };
+    
+    console.log("Validating API key with test request...");
+    const response = await axios.get(url, { headers, params });
+    
+    if (response.status === 200) {
+      console.log("API key validation successful");
+      return { isValid: true };
+    }
+    
+    console.log(`API key validation returned non-200 status: ${response.status}`);
+    return { isValid: false, errorCode: response.status, errorMessage: "Неожиданный ответ от API" };
+    
+  } catch (error) {
+    console.error('Error validating API key:', error);
+    
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      
+      let errorMessage = "Ошибка при проверке API ключа";
+      
+      if (status === 400) {
+        errorMessage = "Неправильный запрос";
+      } else if (status === 401) {
+        errorMessage = "Неверный API ключ";
+      } else if (status === 403) {
+        errorMessage = "Доступ запрещен";
+      } else if (status === 429) {
+        errorMessage = "Слишком много запросов, попробуйте позже";
+      } else if (status && status >= 500) {
+        errorMessage = "Сервер Wildberries временно недоступен";
+      }
+      
+      return { isValid: false, errorCode: status, errorMessage };
+    }
+    
+    return { isValid: false, errorMessage: "Невозможно соединиться с API Wildberries" };
+  }
+};
+
+/**
+ * Проверяет, может ли пользователь добавить новый магазин, исходя из ограничений тарифа
+ */
+export const canAddNewStore = (userId: string | null): { 
+  canAdd: boolean; 
+  currentCount: number; 
+  limit: number;
+  reason?: string;
+} => {
+  if (!userId) {
+    return { 
+      canAdd: false, 
+      currentCount: 0, 
+      limit: 0,
+      reason: 'Пользователь не авторизован' 
+    };
+  }
+  
+  try {
+    // Получаем данные пользователя
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      return { 
+        canAdd: false, 
+        currentCount: 0, 
+        limit: 0,
+        reason: 'Данные пользователя не найдены' 
+      };
+    }
+    
+    const user = JSON.parse(userData);
+    const tariffId = user.tariffId || '1';
+    
+    // Получаем ограничения по тарифу
+    const restrictions = applyTariffRestrictions(tariffId);
+    
+    // Загружаем магазины пользователя
+    const allStores = loadStores();
+    const userStores = allStores.filter(store => store.userId === userId);
+    
+    const currentCount = userStores.length;
+    const limit = restrictions.storeLimit;
+    
+    if (currentCount >= limit) {
+      return {
+        canAdd: false,
+        currentCount,
+        limit,
+        reason: `Достигнут лимит магазинов (${limit}) для вашего тарифа`
+      };
+    }
+    
+    // Проверяем, активна ли подписка
+    if (!user.isSubscriptionActive && !user.isInTrial) {
+      return {
+        canAdd: false,
+        currentCount,
+        limit,
+        reason: 'Подписка неактивна. Активируйте подписку для добавления магазинов.'
+      };
+    }
+    
+    return {
+      canAdd: true,
+      currentCount,
+      limit
+    };
+  } catch (error) {
+    console.error('Ошибка при проверке возможности добавления магазина:', error);
+    return {
+      canAdd: false,
+      currentCount: 0,
+      limit: 1,
+      reason: 'Произошла ошибка при проверке'
+    };
+  }
+};
+
+export const checkStoreLimit = async (tariffId: string): Promise<number> => {
+  try {
+    const restrictions = await applyTariffRestrictions(tariffId);
+    return restrictions.storeLimit;
+  } catch (error) {
+    console.error('Error checking store limit:', error);
+    return 1; // Default to 1 in case of error
+  }
+};
+
+// We'll modify this function to not rely on supabase directly
+export const validateStoreLimit = async (userId: string, currentStoreCount: number): Promise<boolean> => {
+  try {
+    // Since we're not importing supabase, we'll use localStorage instead
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      return false;
+    }
+
+    const user = JSON.parse(userData);
+    const tariffId = user.tariffId || '1';
+    
+    // Get tariff restrictions
+    const restrictions = await applyTariffRestrictions(tariffId);
+    
+    // Check if store limit is reached
+    return currentStoreCount < restrictions.storeLimit;
+  } catch (error) {
+    console.error("Error validating store limit:", error);
+    return false;
+  }
+};
