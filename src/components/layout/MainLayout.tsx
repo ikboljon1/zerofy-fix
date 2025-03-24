@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Home, BarChart2, Package, ShoppingBag, User, Calculator, Sun, Moon, Zap, Megaphone, Settings, LogOut, WarehouseIcon, MenuIcon, Clock } from "lucide-react";
 import { motion } from "framer-motion";
@@ -85,6 +86,12 @@ const MainLayout = ({
     }
     return null;
   };
+  
+  // Обработчик перехода на отдельные страницы
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+  
   return <div className="min-h-screen bg-background pb-16 md:pb-0">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b">
         {isMobile ? <div className="flex items-center justify-between p-4">
@@ -119,9 +126,9 @@ const MainLayout = ({
                       <Home className="mr-2 h-4 w-4" />
                       Dashboard
                     </Button>
-                    <Button variant="ghost" className="justify-start" onClick={() => handleMenuItemClick("analytics")}>
+                    <Button variant="ghost" className="justify-start" onClick={() => handleNavigate("/analytics")}>
                       <BarChart2 className="mr-2 h-4 w-4" />
-                      Analytics
+                      Аналитика
                     </Button>
                     <Button variant="ghost" className="justify-start" onClick={() => handleMenuItemClick("products")}>
                       <Package className="mr-2 h-4 w-4" />
@@ -162,15 +169,15 @@ const MainLayout = ({
                 {renderSubscriptionBadge()}
               </div>
               <nav className="hidden md:flex space-x-6">
-                <Button variant="ghost" onClick={() => onTabChange("home")} className={activeTab === "home" ? "bg-accent" : ""}>
+                <Button variant="ghost" onClick={() => handleNavigate("/dashboard")} className={activeTab === "home" ? "bg-accent" : ""}>
                   <Home className="mr-2 h-4 w-4" />
                   Dashboard
                 </Button>
-                <Button variant="ghost" onClick={() => onTabChange("analytics")} className={activeTab === "analytics" ? "bg-accent" : ""}>
+                <Button variant="ghost" onClick={() => handleNavigate("/analytics")} className={activeTab === "analytics" ? "bg-accent" : ""}>
                   <BarChart2 className="mr-2 h-4 w-4" />
-                  Analytics
+                  Аналитика
                 </Button>
-                <Button variant="ghost" onClick={() => onTabChange("products")} className={activeTab === "products" ? "bg-accent" : ""}>
+                <Button variant="ghost" onClick={() => handleNavigate("/products")} className={activeTab === "products" ? "bg-accent" : ""}>
                   <Package className="mr-2 h-4 w-4" />
                   Товары
                 </Button>
@@ -178,7 +185,7 @@ const MainLayout = ({
                   <ShoppingBag className="mr-2 h-4 w-4" />
                   Магазины
                 </Button>
-                <Button variant="ghost" onClick={() => onTabChange("warehouses")} className={activeTab === "warehouses" ? "bg-accent" : ""}>
+                <Button variant="ghost" onClick={() => handleNavigate("/warehouses")} className={activeTab === "warehouses" ? "bg-accent" : ""}>
                   <WarehouseIcon className="mr-2 h-4 w-4" />
                   Склады
                 </Button>
