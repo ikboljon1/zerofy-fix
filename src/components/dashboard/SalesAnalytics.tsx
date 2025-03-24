@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SalesChart from "./SalesChart";
 import SalesMetrics from "./SalesMetrics";
 import SalesTable from "./SalesTable";
-import { PeriodSelector } from "./PeriodSelector";
+import PeriodSelector from "./PeriodSelector";
 
 type Period = "week" | "month" | "quarter" | "year";
 
@@ -135,11 +135,13 @@ const SalesAnalytics = () => {
       </div>
 
       <SalesMetrics 
-        totalRevenue={metrics.totalRevenue}
-        totalOrders={metrics.totalOrders}
-        averageOrderValue={metrics.averageOrderValue}
-        returnsRate={metrics.returnsRate}
-        topSellingProducts={metrics.topSellingProducts}
+        metrics={{
+          totalRevenue: metrics.totalRevenue,
+          totalOrders: metrics.totalOrders,
+          averageOrderValue: metrics.averageOrderValue,
+          returnsRate: metrics.returnsRate,
+          topSellingProducts: metrics.topSellingProducts
+        }}
         loading={loading}
       />
 
@@ -150,8 +152,8 @@ const SalesAnalytics = () => {
         </CardHeader>
         <CardContent>
           <SalesChart 
-            chartData={chartData}
-            isLoading={loading}
+            data={chartData}
+            loading={loading}
             dataKey="revenue"
           />
         </CardContent>
@@ -164,8 +166,8 @@ const SalesAnalytics = () => {
         </CardHeader>
         <CardContent>
           <SalesTable 
-            tableData={tableData}
-            isLoading={loading}
+            data={tableData}
+            loading={loading}
           />
         </CardContent>
       </Card>
