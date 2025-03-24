@@ -78,10 +78,7 @@ const MainLayout = ({
   const renderSubscriptionBadge = () => {
     if (!user) return null;
     if (user.isInTrial && trialDaysLeft > 0) {
-      return <Badge variant="outline" className="ml-2 bg-amber-100 text-amber-800 border-amber-200">
-          <Clock className="mr-1 h-3 w-3" />
-          Пробный период: {trialDaysLeft} {trialDaysLeft === 1 ? 'день' : trialDaysLeft < 5 ? 'дня' : 'дней'}
-        </Badge>;
+      return;
     }
     if (user.isSubscriptionActive) {
       return;
