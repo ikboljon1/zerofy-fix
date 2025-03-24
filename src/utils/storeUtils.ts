@@ -2,6 +2,7 @@ import { Store, STORES_STORAGE_KEY, STATS_STORAGE_KEY, ORDERS_STORAGE_KEY, SALES
 import { fetchWildberriesStats, fetchWildberriesOrders, fetchWildberriesSales } from "@/services/wildberriesApi";
 import { applyTariffRestrictions } from "@/data/tariffs";
 import axios from "axios";
+// We need to add this for TypeScript
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 export const getLastWeekDateRange = () => {
@@ -608,6 +609,7 @@ export const canAddNewStore = (userId: string | null): {
   }
   
   try {
+    // Получаем данные пользователя
     const userData = localStorage.getItem('user');
     if (!userData) {
       return { 
@@ -621,8 +623,10 @@ export const canAddNewStore = (userId: string | null): {
     const user = JSON.parse(userData);
     const tariffId = user.tariffId || '1';
     
+    // Получаем ограничения по тарифу
     const restrictions = applyTariffRestrictions(tariffId);
     
+    // Загружаем магазины пользователя
     const allStores = loadStores();
     const userStores = allStores.filter(store => store.userId === userId);
     
@@ -638,6 +642,7 @@ export const canAddNewStore = (userId: string | null): {
       };
     }
     
+    // Проверяем, активна ли подписка
     if (!user.isSubscriptionActive && !user.isInTrial) {
       return {
         canAdd: false,
@@ -673,8 +678,10 @@ export const checkStoreLimit = async (tariffId: string): Promise<number> => {
   }
 };
 
+// We'll modify this function to not rely on supabase directly
 export const validateStoreLimit = async (userId: string, currentStoreCount: number): Promise<boolean> => {
   try {
+    // Since we're not importing supabase, we'll use localStorage instead
     const userData = localStorage.getItem('user');
     if (!userData) {
       return false;
@@ -683,59 +690,13 @@ export const validateStoreLimit = async (userId: string, currentStoreCount: numb
     const user = JSON.parse(userData);
     const tariffId = user.tariffId || '1';
     
+    // Get tariff restrictions
     const restrictions = await applyTariffRestrictions(tariffId);
     
+    // Check if store limit is reached
     return currentStoreCount < restrictions.storeLimit;
   } catch (error) {
     console.error("Error validating store limit:", error);
     return false;
   }
-};
-
-export const hasStoreLimit = (subscription: SubscriptionData | boolean): boolean => {
-  if (typeof subscription === 'boolean') {
-    return true;
-  }
-  
-  if (!subscription.isActive && !subscription.isInTrial) {
-    return true;
-  }
-  
-  if (subscription.tariff && typeof subscription.tariff.storeLimit === 'number') {
-    return true;
-  }
-  
-  return false;
-};
-
-export const getStoreLimit = (subscription: SubscriptionData | boolean): number => {
-  if (typeof subscription === 'boolean') {
-    return 1;
-  }
-  
-  if (!subscription.isActive && !subscription.isInTrial) {
-    return 1;
-  }
-  
-  if (subscription.tariff && typeof subscription.tariff.storeLimit === 'number') {
-    return subscription.tariff.storeLimit;
-  }
-  
-  return 1;
-};
-
-export const hasExceededStoreLimit = (userStoreCount: number, subscription: SubscriptionData | boolean): boolean => {
-  if (typeof subscription === 'boolean') {
-    return userStoreCount >= 1;
-  }
-  
-  if (!subscription.isActive && !subscription.isInTrial) {
-    return userStoreCount >= 1;
-  }
-  
-  if (subscription.tariff && typeof subscription.tariff.storeLimit === 'number') {
-    return userStoreCount >= subscription.tariff.storeLimit;
-  }
-  
-  return userStoreCount >= 1;
 };

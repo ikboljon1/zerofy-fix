@@ -1,537 +1,473 @@
-import { useState, useEffect } from "react";
-import { User, updateUser } from "@/services/userService";
-import { useToast } from "@/hooks/use-toast";
-import { initialTariffs } from "@/data/tariffs";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogFooter,
-  DialogDescription
-} from "@/components/ui/dialog";
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { updateUser, User, getUserSubscriptionData, activateSubscription, SubscriptionData, getTrialDaysRemaining } from "@/services/userService";
+import { useToast } from "@/hooks/use-toast";
+import { CalendarIcon, Clock, CreditCard, User as UserIcon, Wallet } from "lucide-react";
+import { format } from 'date-fns';
+import { DatePicker } from "@/components/ui/date-picker"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { TARIFF_STORE_LIMITS } from "@/services/userService";
+import { initialTariffs } from "@/data/tariffs";
+import { getPaymentHistory, saveTariffData, supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  UserCog, 
-  Mail, 
-  Calendar, 
-  ShieldAlert, 
-  CheckCircle2, 
-  XCircle,
-  CreditCard,
-  Package,
-  Clock,
-  AlertTriangle,
-  Save,
-  X,
-  User as UserIcon
-} from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface UserDetailsProps {
-  user: User | null;
-  onClose: () => void;
-  onUserUpdated?: (user: User) => void;
+  user: User;
+  onBack: () => void;
+  onUserUpdated: (user: User) => void;
 }
 
-const UserDetails = ({ user, onClose, onUserUpdated }: UserDetailsProps) => {
-  const [formData, setFormData] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    role: user?.role || "user",
-    tariffId: user?.tariffId || "",
-    subscriptionType: user?.subscriptionType || "monthly",
-    notes: user?.notes || "",
-  });
-  const [status, setStatus] = useState(user?.status || 'active');
+interface PaymentRecord {
+  id: string;
+  user_id: string;
+  amount: number;
+  payment_date: string;
+  subscription_type: string;
+  status: string;
+  payment_method?: string;
+}
+
+const UserDetails = ({ user, onBack, onUserUpdated }: UserDetailsProps) => {
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isInTrial, setIsInTrial] = useState(user?.isInTrial || false);
-  const [isSubscriptionActive, setIsSubscriptionActive] = useState(user?.isSubscriptionActive || false);
+  const [isActivating, setIsActivating] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [company, setCompany] = useState('');
+  const [status, setStatus] = useState<'active' | 'inactive'>('active');
+  const [role, setRole] = useState<'admin' | 'user'>('user');
+  const [tariffId, setTariffId] = useState('1');
+  const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
+  const [subscriptionEndDate, setSubscriptionEndDate] = useState<Date | undefined>(undefined);
+  const [subscriptionMonths, setSubscriptionMonths] = useState(1);
+  const [selectedTariff, setSelectedTariff] = useState<string | undefined>(undefined);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState<number>(0);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      setFormData({
-        name: user.name || "",
-        email: user.email || "",
-        role: user.role || "user",
-        tariffId: user.tariffId || "",
-        subscriptionType: user.subscriptionType || "monthly",
-        notes: user.notes || "",
-      });
-      setStatus(user.status || 'active');
-      setIsInTrial(user.isInTrial || false);
-      setIsSubscriptionActive(user.isSubscriptionActive || false);
-    }
-  }, [user]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleRoleChange = (role: string) => {
-    setFormData(prev => ({ ...prev, role }));
-  };
-
-  const handleStatusChange = (newStatus: string) => {
-    setStatus(newStatus as 'active' | 'inactive');
-  };
-
-  const handleTariffChange = (tariffId: string) => {
-    setFormData(prev => ({ ...prev, tariffId }));
-  };
-
-  const handleSubscriptionTypeChange = (subscriptionType: string) => {
-    setFormData(prev => ({ ...prev, subscriptionType }));
-  };
-
-  const handleTrialToggle = () => {
-    setIsInTrial(!isInTrial);
-  };
-
-  const handleSubscriptionToggle = () => {
-    setIsSubscriptionActive(!isSubscriptionActive);
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "—";
-    try {
-      return format(new Date(dateString), "PPpp", { locale: ru });
-    } catch (e) {
-      return dateString;
-    }
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase();
-  };
-
-  const getTariffName = (tariffId?: string): string => {
-    if (!tariffId) return "Не выбран";
-    const tariff = initialTariffs.find(t => t.id === tariffId);
-    return tariff ? tariff.name : `Тариф ${tariffId}`;
-  };
-
-  const handleSaveChanges = async () => {
-    setIsSaving(true);
-    
-    try {
-      // Create updated user object
-      const updatedUser = {
-        ...user,
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        status: status,
-        tariffId: formData.tariffId,
-        subscriptionType: formData.subscriptionType,
-        isInTrial,
-        isSubscriptionActive,
-        notes: formData.notes,
-      };
-      
-      // Call the API to update user
-      // In a real application, you would make an API call here
-      
-      // Mock successful update
-      setTimeout(() => {
-        if (onUserUpdated) {
-          onUserUpdated(updatedUser);
+    const loadUserData = async () => {
+      setIsLoading(true);
+      try {
+        setName(user.name);
+        setEmail(user.email);
+        setPhone(user.phone || '');
+        setCompany(user.company || '');
+        setStatus(user.status || 'active');
+        setRole(user.role || 'user');
+        setTariffId(user.tariffId);
+        setIsSubscriptionActive(user.isSubscriptionActive);
+        setSubscriptionEndDate(user.subscriptionEndDate ? new Date(user.subscriptionEndDate) : undefined);
+        setSelectedTariff(user.tariffId);
+        
+        const subData = await getUserSubscriptionData(user.id);
+        setSubscriptionData(subData);
+        
+        if (user.isInTrial) {
+          const trialDays = getTrialDaysRemaining(user);
+          setTrialDaysRemaining(trialDays);
         }
-        setIsSaving(false);
-        onClose();
+        
+        // Загружаем историю платежей пользователя
+        loadPaymentHistory();
+      } catch (error) {
+        console.error("Failed to load user data:", error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось загрузить данные пользователя",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadUserData();
+  }, [user, toast]);
+  
+  const loadPaymentHistory = async () => {
+    setIsLoadingPayments(true);
+    try {
+      const payments = await getPaymentHistory(user.id);
+      setPaymentHistory(payments || []);
+    } catch (error) {
+      console.error("Error loading payment history:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить историю платежей",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingPayments(false);
+    }
+  };
+  
+  const handleActivateSubscription = async () => {
+    setIsActivating(true);
+    try {
+      // Находим выбранный тариф
+      const tariff = initialTariffs.find(t => t.id === selectedTariff);
+      if (!tariff) {
+        throw new Error("Тариф не найден");
+      }
+      
+      // Рассчитываем стоимость с учетом скидки
+      let priceWithDiscount = tariff.price * subscriptionMonths;
+      
+      if (subscriptionMonths === 3) {
+        priceWithDiscount *= 0.95; // 5% скидка
+      } else if (subscriptionMonths === 6) {
+        priceWithDiscount *= 0.90; // 10% скидка
+      } else if (subscriptionMonths === 12) {
+        priceWithDiscount *= 0.85; // 15% скидка
+      }
+      
+      const amount = Math.round(priceWithDiscount);
+      
+      console.log(`Admin processing payment of ${amount} for ${subscriptionMonths} months of ${tariff.name} plan`);
+      
+      // Сохраняем информацию о платеже в Supabase через Admin интерфейс
+      const result = await saveTariffData(
+        selectedTariff || user.tariffId, 
+        user.id, 
+        subscriptionMonths,
+        amount
+      );
+      
+      if (result && result.success && result.user) {
+        // Обновляем локального пользователя
+        const updatedUser = {
+          ...user,
+          tariffId: selectedTariff || user.tariffId,
+          isSubscriptionActive: true,
+          subscriptionEndDate: result.user.subscription_expiry
+        };
+        
+        onUserUpdated(updatedUser);
+        
+        // Обновляем историю платежей
+        loadPaymentHistory();
         
         toast({
-          title: "Успешно обновлено",
+          title: "Успешно",
+          description: `Подписка активирована до ${formatDate(result.user.subscription_expiry || '')}`,
+        });
+      } else {
+        throw new Error(result?.error || "Не удалось активировать подписку");
+      }
+    } catch (error) {
+      console.error("Failed to activate subscription:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось активировать подписку",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActivating(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const updatedUser: Partial<User> = {
+        name,
+        email,
+        phone,
+        company,
+        status,
+        role,
+        tariffId,
+        isSubscriptionActive,
+        subscriptionEndDate: subscriptionEndDate ? subscriptionEndDate.toISOString() : undefined,
+      };
+
+      const result = await updateUser(user.id, updatedUser);
+
+      if (result) {
+        onUserUpdated(result);
+        
+        toast({
+          title: "Успешно",
           description: "Данные пользователя успешно обновлены",
         });
-      }, 500);
+      } else {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось обновить данные пользователя",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
-      setIsSaving(false);
-      console.error("Error updating user:", error);
-      
+      console.error("Failed to update user:", error);
       toast({
         title: "Ошибка",
         description: "Не удалось обновить данные пользователя",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  if (!user) return null;
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'dd.MM.yyyy');
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+  
+  const getStoreLimit = () => {
+    if (!tariffId) return 1;
+    return tariffId in TARIFF_STORE_LIMITS ? TARIFF_STORE_LIMITS[tariffId] : 1;
+  };
+
+  const getTariffName = (id: string): string => {
+    const tariff = initialTariffs.find(t => t.id === id);
+    return tariff ? tariff.name : `Тариф ${id}`;
+  };
+
+  if (isLoading) {
+    return <Card>
+      <CardContent>Загрузка...</CardContent>
+    </Card>;
+  }
 
   return (
-    <Dialog open={!!user} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <UserCog className="h-6 w-6 text-blue-500" />
-            <span>Детали пользователя</span>
-          </DialogTitle>
-          <DialogDescription>
-            Просмотр и редактирование информации о пользователе
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs defaultValue="overview" className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Обзор</TabsTrigger>
-            <TabsTrigger value="subscription">Подписка</TabsTrigger>
-            <TabsTrigger value="settings">Настройки</TabsTrigger>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Редактирование пользователя</CardTitle>
+            <CardDescription>Измените данные пользователя</CardDescription>
+          </div>
+          <Button variant="outline" onClick={onBack}>Назад</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="profile">
+          <TabsList className="mb-4">
+            <TabsTrigger value="profile" className="flex items-center">
+              <UserIcon className="mr-2 h-4 w-4" />
+              Профиль
+            </TabsTrigger>
+            <TabsTrigger value="subscription" className="flex items-center">
+              <CreditCard className="mr-2 h-4 w-4" />
+              Подписка
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center">
+              <Wallet className="mr-2 h-4 w-4" />
+              История платежей
+            </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="overview" className="space-y-4 py-4">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/3">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Профиль</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center text-center">
-                    <Avatar className="h-24 w-24 mb-4">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback className="text-lg bg-blue-900 text-blue-100">
-                        {getInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <h3 className="text-xl font-semibold">{user.name}</h3>
-                    <p className="text-muted-foreground">{user.email}</p>
-                    <div className="flex flex-wrap gap-2 justify-center mt-3">
-                      <Badge variant={user.role === 'admin' ? "info" : "secondary"}>
-                        {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
-                      </Badge>
-                      <Badge variant={user.status === 'active' ? "success" : "destructive"}>
-                        {user.status === 'active' ? 'Активен' : 'Неактивен'}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
+          
+          <TabsContent value="profile" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="name">ФИО</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
-
-              <div className="md:w-2/3 space-y-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Информация</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">ID пользователя</h4>
-                        <p className="font-mono text-sm">{user.id}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Дата регистрации</h4>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{formatDate(user.registeredAt)}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Последний вход</h4>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>{user.lastLogin ? formatDate(user.lastLogin) : "Никогда"}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Статус</h4>
-                        <div className="flex items-center gap-1">
-                          {user.status === 'active' ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-500" />
-                          )}
-                          <span>{user.status === 'active' ? 'Активен' : 'Неактивен'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Подписка</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Текущий тариф</h4>
-                        <div className="flex items-center gap-1">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <span>{getTariffName(user.tariffId)}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Тип подписки</h4>
-                        <div className="flex items-center gap-1">
-                          <CreditCard className="h-4 w-4 text-muted-foreground" />
-                          <span>{user.subscriptionType === 'monthly' ? 'Ежемесячная' : 'Годовая'}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Статус подписки</h4>
-                        <div className="flex items-center gap-1">
-                          {user.isSubscriptionActive ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-500" />
-                          )}
-                          <span>{user.isSubscriptionActive ? 'Активна' : 'Неактивна'}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Пробный период</h4>
-                        <div className="flex items-center gap-1">
-                          {user.isInTrial ? (
-                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <span>{user.isInTrial ? 'Активен' : 'Неактивен'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {user.isInTrial && user.trialEndsAt && (
-                      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-3 mt-2">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                          <span className="font-medium">Пробный период истекает {formatDate(user.trialEndsAt)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone">Телефон</Label>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Компания</Label>
+                <Input
+                  id="company"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="status">Статус</Label>
+                <Select value={status} onValueChange={(value) => setStatus(value as 'active' | 'inactive')}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите статус" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Активен</SelectItem>
+                    <SelectItem value="inactive">Неактивен</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="role">Роль</Label>
+                <Select value={role} onValueChange={(value) => setRole(value as 'admin' | 'user')}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите роль" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Администратор</SelectItem>
+                    <SelectItem value="user">Пользователь</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'Сохранение...' : 'Сохранить'}
+              </Button>
+            </div>
           </TabsContent>
-
-          <TabsContent value="subscription" className="space-y-4 py-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Управление подпиской</CardTitle>
-                <CardDescription>
-                  Настройте параметры подписки пользователя
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="tariffId">Тариф</Label>
-                    <Select 
-                      value={formData.tariffId} 
-                      onValueChange={handleTariffChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите тариф" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Не выбран</SelectItem>
-                        {initialTariffs.map(tariff => (
-                          <SelectItem key={tariff.id} value={tariff.id}>
-                            {tariff.name} ({tariff.price} ₽/{tariff.period === 'monthly' ? 'мес' : 'год'})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subscriptionType">Тип подписки</Label>
-                    <Select 
-                      value={formData.subscriptionType} 
-                      onValueChange={handleSubscriptionTypeChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите тип подписки" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Ежемесячная</SelectItem>
-                        <SelectItem value="yearly">Годовая</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                  <div className="flex items-center justify-between space-x-2 p-4 border rounded-md">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="subscription-active">Подписка активна</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Пользователь имеет доступ к платным функциям
-                      </p>
-                    </div>
-                    <Switch
-                      id="subscription-active"
-                      checked={isSubscriptionActive}
-                      onCheckedChange={handleSubscriptionToggle}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between space-x-2 p-4 border rounded-md">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="trial-active">Пробный период</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Пользователь находится на пробном периоде
-                      </p>
-                    </div>
-                    <Switch
-                      id="trial-active"
-                      checked={isInTrial}
-                      onCheckedChange={handleTrialToggle}
-                    />
-                  </div>
-                </div>
-
-                {user.subscriptionId && (
-                  <div className="pt-4">
-                    <h3 className="text-sm font-medium mb-2">ID подписки</h3>
-                    <div className="p-2 bg-muted rounded-md font-mono text-sm">
-                      {user.subscriptionId}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          
+          <TabsContent value="subscription" className="space-y-4">
+            {user.isInTrial && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <h3 className="font-medium flex items-center">
+                  <Clock className="h-4 w-4 mr-2 text-amber-500" />
+                  Пробный период
+                </h3>
+                <p>Активирован с тарифом "{getTariffName('3')}"</p>
+                <p>Осталось дней: {trialDaysRemaining}</p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="tariff">Тариф</Label>
+              <Select value={selectedTariff} onValueChange={setSelectedTariff}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите тариф" />
+                </SelectTrigger>
+                <SelectContent>
+                  {initialTariffs.map(tariff => (
+                    <SelectItem key={tariff.id} value={tariff.id}>{tariff.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="mt-4 flex items-center space-x-2">
+              <Checkbox
+                id="isSubscriptionActive"
+                checked={isSubscriptionActive}
+                onCheckedChange={(checked) => setIsSubscriptionActive(!!checked)}
+              />
+              <Label htmlFor="isSubscriptionActive">Подписка активна</Label>
+            </div>
+            
+            <div className="mt-4">
+              <Label>Дата окончания подписки</Label>
+              <DatePicker
+                value={subscriptionEndDate}
+                onValueChange={setSubscriptionEndDate}
+              />
+            </div>
+            
+            <div className="mt-4">
+              <Label htmlFor="subscriptionMonths">Продлить на (месяцев)</Label>
+              <Select 
+                value={subscriptionMonths.toString()}
+                onValueChange={(value) => setSubscriptionMonths(parseInt(value))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите период" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 месяц</SelectItem>
+                  <SelectItem value="3">3 месяца (скидка 5%)</SelectItem>
+                  <SelectItem value="6">6 месяцев (скидка 10%)</SelectItem>
+                  <SelectItem value="12">12 месяцев (скидка 15%)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button 
+              className="mt-4 w-full" 
+              onClick={handleActivateSubscription} 
+              disabled={isActivating}
+            >
+              {isActivating ? 'Активация...' : 'Активировать подписку'}
+            </Button>
+            
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
+              </Button>
+            </div>
           </TabsContent>
-
-          <TabsContent value="settings" className="space-y-4 py-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Основные настройки</CardTitle>
-                <CardDescription>
-                  Управление основной информацией пользователя
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">ФИО</Label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Роль</Label>
-                    <div className="relative">
-                      <ShieldAlert className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      <Select 
-                        value={formData.role} 
-                        onValueChange={handleRoleChange}
-                      >
-                        <SelectTrigger className="pl-9">
-                          <SelectValue placeholder="Выберите роль пользователя" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Администратор</SelectItem>
-                          <SelectItem value="user">Пользователь</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Статус</Label>
-                    <Select 
-                      value={status} 
-                      onValueChange={handleStatusChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите статус пользователя" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Активен</SelectItem>
-                        <SelectItem value="inactive">Неактивен</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Заметки</Label>
-                  <Textarea
-                    id="notes"
-                    name="notes"
-                    value={formData.notes || ""}
-                    onChange={handleInputChange}
-                    placeholder="Внутренние заметки о пользователе"
-                    rows={4}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          
+          <TabsContent value="payments" className="space-y-4">
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Дата</TableHead>
+                    <TableHead>Тариф</TableHead>
+                    <TableHead>Сумма</TableHead>
+                    <TableHead>Метод оплаты</TableHead>
+                    <TableHead>Статус</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingPayments ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4">Загрузка платежей...</TableCell>
+                    </TableRow>
+                  ) : paymentHistory.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4">Нет платежей</TableCell>
+                    </TableRow>
+                  ) : (
+                    paymentHistory.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                        <TableCell>{getTariffName(payment.subscription_type)}</TableCell>
+                        <TableCell>{payment.amount} ₽</TableCell>
+                        <TableCell>{payment.payment_method || 'Карта'}</TableCell>
+                        <TableCell>
+                          {payment.status === 'completed' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Выполнен
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              {payment.status}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button onClick={loadPaymentHistory} variant="outline">
+                Обновить историю
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
-
-        <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
-            <X className="mr-2 h-4 w-4" />
-            Отмена
-          </Button>
-          <Button onClick={handleSaveChanges} disabled={isSaving}>
-            {isSaving ? (
-              <span className="animate-spin mr-2">⟳</span>
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            Сохранить
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   );
 };
 

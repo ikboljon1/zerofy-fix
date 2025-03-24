@@ -64,6 +64,7 @@ export default function UserList({ onSelectUser, onAddUser }: UserListProps) {
   const itemsPerPage = 5;
   const [paginatedUsers, setPaginatedUsers] = useState<User[]>([]);
 
+  // Memoize the fetchUsers function so it can be used in useEffect and as a callback
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -170,30 +171,6 @@ export default function UserList({ onSelectUser, onAddUser }: UserListProps) {
     if (page < totalPages) {
       setPage(page + 1);
     }
-  };
-
-  const renderSubscriptionBadge = () => {
-    if (!user) return null;
-    return (
-      <div className="flex flex-wrap gap-2 mt-1">
-        {user.role === 'admin' && (
-          <Badge variant="info" className="capitalize">
-            Админ
-          </Badge>
-        )}
-        <Badge variant={user.status === 'active' ? "success" : "destructive"}>
-          {user.status === 'active' ? 'Активен' : 'Неактивен'}
-        </Badge>
-        <Badge variant="outline" className="bg-gray-800 border-gray-700">
-          {getTariffName(user.tariffId)}
-        </Badge>
-        {user.isInTrial && (
-          <Badge variant="warning">
-            Пробный период
-          </Badge>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -388,13 +365,30 @@ export default function UserList({ onSelectUser, onAddUser }: UserListProps) {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                          {renderSubscriptionBadge()}
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {user.role === 'admin' && (
+                              <Badge variant="info" className="capitalize">
+                                Админ
+                              </Badge>
+                            )}
+                            <Badge variant={user.status === 'active' ? "success" : "destructive"}>
+                              {user.status === 'active' ? 'Активен' : 'Неактивен'}
+                            </Badge>
+                            <Badge variant="outline" className="bg-gray-800 border-gray-700">
+                              {getTariffName(user.tariffId)}
+                            </Badge>
+                            {user.isInTrial && (
+                              <Badge variant="warning">
+                                Пробный период
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="text-xs text-muted-foreground text-right hidden md:block">
                           <div>Регистрация: {formatDate(user.registeredAt)}</div>
                           <div>Последний вход: {user.lastLogin ? formatDate(user.lastLogin) : "—"}</div>
-                          {user.trialEndsAt && (
-                            <div>Окончание пробного периода: {formatDate(user.trialEndsAt)}</div>
+                          {user.trialEndDate && (
+                            <div>Окончание пробного периода: {formatDate(user.trialEndDate)}</div>
                           )}
                         </div>
                         <DropdownMenu>

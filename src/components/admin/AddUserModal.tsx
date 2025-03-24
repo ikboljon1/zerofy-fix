@@ -36,8 +36,8 @@ export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserMo
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleRoleChange = (role: "admin" | "user") => {
-    setFormData(prev => ({ ...prev, role }));
+  const handleRoleChange = (value: string) => {
+    setFormData(prev => ({ ...prev, role: value as "admin" | "user" }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,34 +55,29 @@ export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserMo
     setIsSubmitting(true);
     
     try {
-      const newUserData = {
-        ...formData,
+      const newUser = await addUser({
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
         status: "active",
-        registeredAt: new Date().toISOString(),
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name.replace(/\s+/g, '')}`
-      };
+      });
       
-      const response = await addUser(newUserData);
+      toast({
+        title: "Успешно",
+        description: "Пользователь успешно добавлен",
+      });
       
-      if (response && 'id' in response) {
-        toast({
-          title: "Успешно",
-          description: "Пользователь успешно добавлен",
-        });
-        
-        onUserAdded(response as User);
-        
-        // Reset form
-        setFormData({
-          name: "",
-          email: "",
-          role: "user",
-        });
-        
-        onClose();
-      } else {
-        throw new Error("Неверный ответ от сервера");
-      }
+      onUserAdded(newUser);
+      
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        role: "user",
+      });
+      
+      onClose();
     } catch (error) {
       console.error("Error adding user:", error);
       toast({
@@ -146,7 +141,7 @@ export default function AddUserModal({ isOpen, onClose, onUserAdded }: AddUserMo
               <ShieldAlert className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <Select 
                 value={formData.role} 
-                onValueChange={(value) => handleRoleChange(value as 'admin' | 'user')}
+                onValueChange={handleRoleChange}
               >
                 <SelectTrigger className="pl-9 w-full">
                   <SelectValue placeholder="Выберите роль пользователя" />

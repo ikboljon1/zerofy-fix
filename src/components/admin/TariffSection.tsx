@@ -34,27 +34,11 @@ import {
 } from "lucide-react";
 import { Tariff, initialTariffs } from "@/data/tariffs";
 
-interface TariffSectionProps {
-  userData: any;
-}
-
-const TariffSection = ({ userData }: TariffSectionProps) => {
+export default function TariffSection() {
   const [tariffs, setTariffs] = useState<Tariff[]>(initialTariffs);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentTariff, setCurrentTariff] = useState<Tariff | null>(null);
   const [newFeature, setNewFeature] = useState('');
-  const [editingTariff, setEditingTariff] = useState<Tariff>({
-    id: "",
-    name: "",
-    description: "",
-    price: 0,
-    period: "monthly",
-    features: [],
-    isPopular: false,
-    isActive: true,
-    billingPeriod: "Ежемесячно",
-    storeLimit: 1
-  });
   const { toast } = useToast();
 
   const handleEdit = (tariff: Tariff) => {
@@ -144,22 +128,6 @@ const TariffSection = ({ userData }: TariffSectionProps) => {
       isPopular: false,
       isActive: true,
       storeLimit: 1
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleEditTariff = (tariff: Tariff) => {
-    setEditingTariff({
-      id: tariff.id,
-      name: tariff.name,
-      price: tariff.price,
-      period: tariff.period,
-      description: tariff.description,
-      features: tariff.features,
-      isPopular: tariff.isPopular,
-      isActive: tariff.isActive,
-      billingPeriod: tariff.billingPeriod || (tariff.period === "monthly" ? "Ежемесячно" : "Ежегодно"),
-      storeLimit: tariff.storeLimit || 1
     });
     setIsEditDialogOpen(true);
   };
@@ -583,6 +551,4 @@ const TariffSection = ({ userData }: TariffSectionProps) => {
       </Dialog>
     </div>
   );
-};
-
-export default TariffSection;
+}
