@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,7 +8,6 @@ import Products from "./pages/Products";
 import Warehouses from "./pages/Warehouses";
 import Advertising from "./components/Advertising";
 import Admin from "./pages/Admin";
-import Analytics from "./pages/Analytics";
 import LandingPage from "./pages/LandingPage";
 import Navbar from "./components/layout/Navbar";
 import { useEffect, useState } from "react";
@@ -82,11 +80,6 @@ const App = () => {
             <Route path="/warehouses" element={
               <ProtectedRoute>
                 <Warehouses />
-              </ProtectedRoute>
-            } />
-            <Route path="/analytics" element={
-              <ProtectedRoute>
-                <Analytics />
               </ProtectedRoute>
             } />
             <Route path="/advertising" element={
